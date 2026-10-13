@@ -74,6 +74,11 @@ export default defineConfig({
   server: {
     host: true, // listen on the LAN, not just localhost, so phones can connect
     port: 5173,
+    // If 5173 is taken (often another project's dev server, speaking plain http),
+    // stop with an error instead of quietly moving to 5174: opening the usual
+    // https://localhost:5173 would then reach that other server and fail with
+    // ERR_SSL_PROTOCOL_ERROR.
+    strictPort: true,
   },
   preview: {
     host: true,

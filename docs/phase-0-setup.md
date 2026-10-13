@@ -44,6 +44,7 @@ It also lists the three pages (`index.html`, `controller/`, `game/`) so `npm run
 
 | Symptom | Fix |
 | --- | --- |
+| `ERR_SSL_PROTOCOL_ERROR` on `https://localhost:5173`, or `npm run dev` says "Port 5173 is already in use" | Something else holds port 5173, usually another project's dev server (plain http). Find it with `lsof -i :5173` and stop it, or run on another port with `npm run dev -- --port 5174` and open that port instead. |
 | Phone can't load the page at all | Same Wi-Fi? Some office, school and guest networks block devices from talking to each other: try your phone's hotspot with the computer joined to it. |
 | macOS asks whether `node` may accept incoming connections | Click **Allow**. If you clicked Deny: System Settings → Network → Firewall → Options. |
 | Game screen warns it has no Wi-Fi address | The computer has no LAN address: connect it to Wi-Fi. |
