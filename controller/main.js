@@ -154,6 +154,8 @@ function sendInput() {
     type: 'input',
     steer: Math.round(processor.value * 1000) / 1000,
     seq: ++net.seq,
+    gas: pedal('gas'),
+    brake: pedal('brake'),
     rtt: net.conn.rtt === null ? undefined : Math.round(net.conn.rtt),
   });
 }
@@ -170,9 +172,13 @@ const state = {
   tooFlat: false,
   eventTimes: [],
   wakeLock: null,
-  keys: { left: false, right: false },
+  keys: { left: false, right: false, gas: false, brake: false },
   keyboardAngle: 0,
+  pads: { gas: new Set(), brake: new Set() }, // pointer ids holding each pedal
 };
+
+/** Pedals: held on screen (any finger) or with the keyboard. */
+const pedal = (name) => state.pads[name].size > 0 || state.keys[name];
 
 function currentScreenAngle() {
   const angle = screen.orientation?.angle ?? window.orientation ?? 0;
@@ -313,15 +319,63 @@ window.addEventListener('orientationchange', onScreenRotated);
 
 // ---------- Keyboard fallback (desk testing) ----------
 
-const KEY_MAP = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right' };
+const KEY_MAP = {
+  ArrowLeft: 'left',
+  a: 'left',
+  A: 'left',
+  ArrowRight: 'right',
+  d: 'right',
+  D: 'right',
+  ArrowUp: 'gas',
+  w: 'gas',
+  W: 'gas',
+  ArrowDown: 'brake',
+  s: 'brake',
+  S: 'brake',
+};
 
 window.addEventListener('keydown', (e) => {
-  if (KEY_MAP[e.key]) state.keys[KEY_MAP[e.key]] = true;
+  if (e.target instanceof HTMLInputElement) return; // typing the room code
+  if (KEY_MAP[e.key]) {
+    e.preventDefault();
+    state.keys[KEY_MAP[e.key]] = true;
+  }
   if (e.key === 'c' || e.key === 'C') processor.recenter();
 });
 window.addEventListener('keyup', (e) => {
   if (KEY_MAP[e.key]) state.keys[KEY_MAP[e.key]] = false;
 });
+
+window.addEventListener('blur', () => {
+  for (const key of Object.keys(state.keys)) state.keys[key] = false;
+});
+
+// ---------- Pedals (Phase 3) ----------
+
+/**
+ * Pointer events, one per finger: each pedal remembers which fingers are on it,
+ * so pressing both at once works and lifting one doesn't release the other.
+ */
+function setupPedal(element, name) {
+  const pressed = state.pads[name];
+  const release = (e) => {
+    pressed.delete(e.pointerId);
+    element.classList.toggle('down', pressed.size > 0);
+  };
+  element.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    element.setPointerCapture?.(e.pointerId); // keep the finger even if it slides off the edge
+    pressed.add(e.pointerId);
+    element.classList.add('down');
+    navigator.vibrate?.(8); // a tiny tick on Android; iPhone ignores it
+  });
+  element.addEventListener('pointerup', release);
+  element.addEventListener('pointercancel', release);
+  element.addEventListener('lostpointercapture', release);
+  element.addEventListener('contextmenu', (e) => e.preventDefault()); // long-press menu
+}
+setupPedal($('gas-pad'), 'gas');
+setupPedal($('brake-pad'), 'brake');
 
 function tickKeyboard(dtMs, now) {
   // Ease a pretend wheel angle toward a little past full lock, like turning a real wheel.

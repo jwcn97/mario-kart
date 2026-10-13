@@ -84,6 +84,8 @@ export default defineConfig({
     host: true,
   },
   build: {
+    // Three.js alone is ~550 kB before gzip (~150 kB after). Expected for a 3D game.
+    chunkSizeWarningLimit: 800,
     rolldownOptions: {
       input: {
         hub: resolve(root, 'index.html'),

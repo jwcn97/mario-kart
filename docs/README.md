@@ -10,6 +10,7 @@ Everything written down about how this game works and why it's built this way. C
 | [phase-0-setup.md](phase-0-setup.md) | Dev server, HTTPS on your phone, troubleshooting |
 | [phase-1-steering.md](phase-1-steering.md) | How phone tilt becomes a steering value, step by step |
 | [phase-2-networking.md](phase-2-networking.md) | Rooms, the message protocol, reconnects, measuring lag |
+| [phase-3-driving.md](phase-3-driving.md) | Three.js scene, fixed timestep, arcade kart physics, input mixing, cameras |
 
 ## Conventions
 

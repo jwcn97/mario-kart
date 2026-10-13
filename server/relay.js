@@ -181,6 +181,8 @@ export class Relay {
       slot: session.slot,
       steer: clamp(msg.steer, -1, 1),
       seq: Number.isInteger(msg.seq) ? msg.seq : 0,
+      gas: msg.gas === true,
+      brake: msg.brake === true,
     };
     if (isFiniteNumber(msg.rtt)) out.rtt = clamp(Math.round(msg.rtt), 0, 10_000);
     this.#toHost(session.room, out);

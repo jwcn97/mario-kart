@@ -16,7 +16,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | Controller page | Each player's phone browser | Read the gyro and buttons, send input, show a mini HUD | Phase 1 (steering), Phase 2 (joins a room, streams input) |
 | Relay server | Inside the dev server during development; a small host when shipped | Pair phones with a game by room code, forward messages | Phase 2 |
-| Game screen | Any big-screen browser | Phase 2: room code, QR, live dials. Phase 3+: 3D world, physics, race rules | Phase 2, racing from Phase 3 |
+| Game screen | Any big-screen browser | 3D world, kart physics, cameras, HUD; race rules from Phase 4 | Phase 2 (room + QR), Phase 3 (driving) |
 
 Why a server in the middle: browsers can't open a direct connection to each other without help, and a server gives one place to manage rooms, player slots and reconnects. It holds no game logic; that all lives on the game screen. Message list and reconnect rules: [phase-2-networking.md](phase-2-networking.md).
 
@@ -27,12 +27,17 @@ mario-kart/
 ├── index.html            Dev hub: links to the controller and game pages
 ├── controller/           Phone controller page
 │   ├── index.html
-│   ├── main.js           Permission, sensor events, joining a room, sending input, UI
+│   ├── main.js           Permission, sensor events, pedals, joining a room, sending input, UI
 │   ├── steering.js       Pure steering math (tilt -> -1..+1), unit-tested
 │   └── style.css
 ├── game/                 Shared game screen
 │   ├── index.html
-│   ├── main.js           Opens a room, QR code, live player cards
+│   ├── main.js           Wires it together: room + QR, karts per player, loop, HUD
+│   ├── physics.js        Arcade kart model and collisions (no Three.js), unit-tested
+│   ├── loop.js           Fixed 120 Hz timestep with interpolation, unit-tested
+│   ├── input.js          Phone + keyboard input, whichever is active, unit-tested
+│   ├── course.js         Arena size, start grid, obstacle layout (plain data)
+│   ├── world.js          Three.js scene: ground, walls, obstacles, kart models, cameras
 │   └── style.css
 ├── server/
 │   ├── relay.js          Room and player rules (no networking), unit-tested
@@ -55,4 +60,5 @@ mario-kart/
 - **@vitejs/plugin-basic-ssl** gives the dev server a self-signed HTTPS certificate, which phones require before they'll share motion sensors.
 - **ws** is the WebSocket server library for Node. Browsers have WebSockets built in.
 - **qrcode** draws the join QR code on the game screen.
+- **three** (Three.js) draws the 3D world with WebGL. No physics engine: kart physics is our own ~200 lines.
 - **Node's built-in test runner** (`node --test`) runs the tests; no extra test library.

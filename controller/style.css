@@ -150,6 +150,71 @@ body {
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
+.play {
+  --pedal-width: clamp(96px, 21vw, 200px);
+}
+
+.pedal {
+  position: absolute;
+  top: calc(max(10px, env(safe-area-inset-top)) + 64px);
+  bottom: max(10px, env(safe-area-inset-bottom));
+  width: var(--pedal-width);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 22px;
+  border: 2px solid transparent;
+  font: 900 22px/1 var(--font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+  transition:
+    transform 60ms,
+    filter 60ms;
+}
+
+.pedal small {
+  font: 600 11px/1.2 var(--font);
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.75;
+}
+
+.pedal.brake {
+  left: max(16px, env(safe-area-inset-left));
+  background: color-mix(in srgb, var(--danger) 16%, var(--surface));
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+  color: var(--danger);
+}
+
+.pedal.gas {
+  right: max(16px, env(safe-area-inset-right));
+  background: color-mix(in srgb, var(--ok) 16%, var(--surface));
+  border-color: color-mix(in srgb, var(--ok) 55%, transparent);
+  color: var(--ok);
+}
+
+.pedal.down {
+  transform: scale(0.97);
+  filter: brightness(1.15);
+}
+
+.pedal.brake.down {
+  background: var(--danger);
+  color: #1f0b09;
+}
+
+.pedal.gas.down {
+  background: var(--ok);
+  color: #0c1d14;
+}
+
 .stage {
   width: 100%;
   max-width: 960px;
@@ -394,4 +459,16 @@ body {
   width: 20px;
   height: 20px;
   accent-color: var(--accent);
+}
+
+/* The pedals sit at the sides (Phase 3): keep everything else between them. */
+.play .stage {
+  width: auto;
+  max-width: none;
+  margin-inline: calc(var(--pedal-width) + 12px);
+}
+
+.play .notice,
+.play .debug {
+  margin-inline: calc(var(--pedal-width) + 12px);
 }

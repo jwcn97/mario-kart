@@ -9,60 +9,56 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <div class="kerb"></div>
+    <!-- The 3D world fills the screen; everything else floats on top. -->
+    <canvas id="scene"></canvas>
 
-    <header class="top">
-      <h1 class="title">Kart Racer</h1>
-      <span class="phase">Phase 2 · phones linked, no racing yet</span>
-      <span id="server-chip" class="chip">connecting…</span>
-    </header>
-
-    <main class="layout">
-      <!-- Join panel: QR code + room code -->
-      <section class="join" aria-label="Join this game">
-        <h2>Scan to join</h2>
-        <div id="qr" class="qr" aria-label="QR code to join"></div>
-        <div class="code-label">Room code</div>
+    <!-- Join panel: QR code + room code (Q hides it) -->
+    <section id="join" class="panel join" aria-label="Join this game">
+      <div id="qr" class="qr" aria-label="QR code to join"></div>
+      <div class="join-text">
+        <div class="join-title">Scan to join</div>
+        <div class="code-label">Room</div>
         <div id="room-code" class="room-code">····</div>
         <p id="join-url" class="join-url"></p>
         <p id="join-warning" class="join-warning" hidden></p>
-      </section>
+      </div>
+    </section>
 
-      <!-- One card per player slot, filled in by main.js -->
-      <section id="players" class="players" aria-label="Players"></section>
-    </main>
+    <div class="top-right">
+      <span id="camera-chip" class="chip">auto camera</span>
+      <span id="server-chip" class="chip">connecting…</span>
+    </div>
 
-    <footer id="footer" class="footer"></footer>
+    <!-- One chip per kart: colour, speed, input source -->
+    <section id="hud" class="hud" aria-label="Players"></section>
+
+    <!-- Phase 2 connection stats (D toggles) -->
+    <section id="debug" class="panel debug" hidden>
+      <table>
+        <thead>
+          <tr><th>Player</th><th>Input</th><th>Msgs/s</th><th>Phone ⇄ server</th><th>Tilt → screen</th><th>Last input</th></tr>
+        </thead>
+        <tbody id="debug-rows"></tbody>
+      </table>
+      <p id="debug-footer" class="debug-footer"></p>
+    </section>
+
+    <p class="keys">
+      <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> P1 · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> P2 ·
+      <kbd>C</kbd> camera · <kbd>R</kbd> reset · <kbd>Q</kbd> join panel · <kbd>I</kbd> stats
+    </p>
 
     <div id="banner" class="banner" role="alert" hidden></div>
 
-    <template id="player-card">
-      <article class="card empty">
-        <div class="card-head">
-          <span class="badge"></span>
-          <span class="status"></span>
+    <template id="hud-chip">
+      <article class="player">
+        <span class="badge"></span>
+        <div class="speed"><span class="kmh">0</span><small>km/h</small></div>
+        <div class="meta">
+          <span class="source"></span>
+          <div class="steer"><div class="steer-centre"></div><div class="steer-fill"></div></div>
+          <div class="pedals"><span class="gas">GAS</span><span class="brake">BRAKE</span></div>
         </div>
-        <div class="card-body">
-          <svg class="wheel" viewBox="-100 -100 200 200" aria-hidden="true">
-            <g class="rotor">
-              <circle r="80" class="rim" />
-              <path d="M -20 0 H -74 M 20 0 H 74 M 0 20 V 74" class="spoke" />
-              <circle r="22" class="hub" />
-              <rect x="-7" y="-96" width="14" height="28" rx="4" class="mark" />
-            </g>
-          </svg>
-          <div class="readout">
-            <div class="value">+0.00</div>
-            <div class="bar"><div class="bar-centre"></div><div class="bar-fill"></div></div>
-          </div>
-        </div>
-        <dl class="stats">
-          <div><dt>Messages</dt><dd class="rate">–</dd></div>
-          <div><dt>Phone ⇄ server</dt><dd class="phone-rtt">–</dd></div>
-          <div><dt>Tilt → screen</dt><dd class="latency">–</dd></div>
-          <div><dt>Last input</dt><dd class="age">–</dd></div>
-        </dl>
-        <p class="empty-hint"></p>
       </article>
     </template>
 

@@ -64,3 +64,31 @@ A short log of design choices. Newest at the bottom. Each entry: what we chose, 
 
 **Chose:** a game screen that reconnects to a server with no memory of its room recreates it under the same code; phones retry "no such room" every 2 s and ask for their previous slot.
 **Why:** the dev server restarts whenever its config changes, and a deployed server will restart on every update. Players shouldn't have to rescan, and shouldn't swap colours mid-session.
+
+## 12. Three.js, own arcade physics, no physics engine (Phase 3)
+
+**Chose:** Three.js for drawing only; kart physics written by hand in `game/physics.js`.
+**Instead of:** a physics engine (Rapier, cannon-es) or a full game engine.
+**Why:** kart racers want arcade handling (instant grip, tunable understeer), not realistic simulation. A physics engine would need fighting to feel arcade-y. Hand-written physics is ~200 lines, has no Three.js dependency, and is unit-tested with plain numbers.
+
+## 13. Fixed 120 Hz physics with interpolated rendering (Phase 3)
+
+**Chose:** an accumulator that runs physics in equal 1/120 s steps, drawing karts between the last two states.
+**Instead of:** stepping by each frame's duration.
+**Why:** identical handling on 60 Hz laptops and 144 Hz monitors, and physics that's deterministic enough to test. 120 rather than 60 so fast karts don't tunnel through thin obstacles.
+
+## 14. Velocity always along the nose (Phase 3)
+
+**Chose:** one scalar speed along the kart's heading; no sideways velocity.
+**Why:** the simplest model that feels right for a first drive, and easy to reason about. Sliding (drifting) is a deliberate Phase 5 feature, layered on top.
+
+## 15. Keyboard overrides a phone only while keys are held (Phase 3)
+
+**Chose:** arrows = P1, W A S D = P2; holding any of a slot's keys takes over that slot, releasing hands back to the phone. Phone input older than 500 ms counts as released.
+**Why:** test without phones, and take over a kart mid-drive without any mode switch. The staleness rule means a locked or lost phone never leaves a kart driving off with the gas held.
+
+## 16. One shared camera that frames everyone (Phase 3)
+
+**Chose:** auto camera: chase cam for one kart, a "group" camera over the middle of the pack for several.
+**Instead of:** split screen right away.
+**Why:** the plan saves split screen for Phase 7. A group camera is enough to see everyone while the driving itself gets built.

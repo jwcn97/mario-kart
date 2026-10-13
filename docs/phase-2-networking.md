@@ -57,8 +57,8 @@ Every message is a small JSON object with a `type`.
 | Server → game | `player` | `slot`, `name`, `color`, `connected` | A player joined, dropped, or came back |
 | Server → game | `player-removed` | `slot` | That slot's grace period ran out; it's free again |
 | Server → phone | `host-status` | `connected` | Is the game screen there? |
-| Phone → server | `input` | `steer`, `seq`, `rtt?` | Current steering (−1…1), a counter, my ping time |
-| Server → game | `input` | `slot`, `steer`, `seq`, `rtt?` | The same, tagged with who sent it |
+| Phone → server | `input` | `steer`, `seq`, `gas`, `brake`, `rtt?` | Current steering (−1…1), a counter, pedals (from Phase 3), my ping time |
+| Server → game | `input` | `slot`, `steer`, `seq`, `gas`, `brake`, `rtt?` | The same, tagged with who sent it |
 | Either → server | `ping` | `t` | Timestamp, for measuring round-trip time |
 | Server → either | `pong` | `t` | The same timestamp, straight back |
 | Server → either | `error` | `reason` | `no-room`, `room-full`, `replaced`, `room-closed` |
@@ -113,4 +113,4 @@ Half a round trip is only an estimate: the way there and back can differ. But it
 
 ## Next: Phase 3
 
-Turn each player's `steer` into a kart: a Three.js scene on the game screen, one kart per connected phone, plus accelerate and brake buttons on the phone.
+Turn each player's `steer` into a kart: a Three.js scene on the game screen, one kart per connected phone, plus gas and brake pads on the phone: [phase-3-driving.md](phase-3-driving.md).

@@ -94,8 +94,8 @@ test('input is forwarded to the host, tagged with the slot and clamped', () => {
   const { relay, host, phone } = setup();
   const h = host();
   const p = phone(h.last('room').code, ID(1));
-  relay.receive(p, { type: 'input', steer: 3, seq: 7, rtt: 21.6 });
-  assert.deepEqual(h.last('input'), { type: 'input', slot: 1, steer: 1, seq: 7, rtt: 22 });
+  relay.receive(p, { type: 'input', steer: 3, seq: 7, rtt: 21.6, gas: true, brake: 'yes' });
+  assert.deepEqual(h.last('input'), { type: 'input', slot: 1, steer: 1, seq: 7, gas: true, brake: false, rtt: 22 });
 });
 
 test('bad messages are ignored', () => {
