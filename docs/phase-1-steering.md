@@ -6,7 +6,7 @@ Code: [`controller/steering.js`](../controller/steering.js) (the math, no browse
 
 ## Try it
 
-1. `npm run dev`, scan the QR code, accept the certificate warning ([phase-0-setup.md](phase-0-setup.md)).
+1. `npm run dev`, open the game screen and scan its QR code (or open `/controller/` on your phone and leave the room code empty to practise), and accept the certificate warning ([phase-0-setup.md](phase-0-setup.md)).
 2. Tap **Tap to start**. On iPhone, tap **Allow** when asked about motion.
 3. Turn the phone sideways and hold it like a steering wheel. Turn it.
 4. Open **Tune** to change the dead zone, full-lock angle, smoothing and curve while you steer. Settings are saved on the phone.
@@ -124,4 +124,4 @@ With `curve` 0 the response is linear. Raising it softens small turns (fine cont
 
 ## Next: Phase 2
 
-Send `processor.value` to the relay server ~60 times a second so the shared game screen can show each phone's dial.
+Send `processor.value` to the relay server 60 times a second so the shared game screen can show each phone's dial: [phase-2-networking.md](phase-2-networking.md).

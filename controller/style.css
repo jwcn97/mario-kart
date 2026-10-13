@@ -63,6 +63,38 @@ body {
   line-height: 1.45;
 }
 
+.room-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font: 700 13px/1 var(--font);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.room-field input {
+  width: 5.2em;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--accent);
+  font: 800 26px/1 var(--mono);
+  letter-spacing: 0.15em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.room-field input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.room-field input::placeholder {
+  color: var(--line);
+}
+
 .fine {
   margin: 0;
   color: var(--muted);
@@ -156,7 +188,16 @@ body {
 }
 
 .wheel-mark {
-  fill: var(--accent);
+  fill: var(--player, var(--accent));
+}
+
+/* Once joined, a strip in the player's colour runs along the top of the screen. */
+.play::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 5px;
+  background: var(--player, transparent);
 }
 
 .readout {
@@ -204,7 +245,7 @@ body {
   bottom: 0;
   left: 50%;
   width: 0;
-  background: var(--accent);
+  background: var(--player, var(--accent));
 }
 
 .bar-labels {

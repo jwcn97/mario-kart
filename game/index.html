@@ -6,29 +6,66 @@
     <title>Kart Racer Game</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/shared/theme.css" />
-    <style>
-      main {
-        min-height: 100vh;
-        display: grid;
-        place-content: center;
-        text-align: center;
-        padding: 16px;
-      }
-      h1 {
-        font-size: clamp(32px, 7vw, 56px);
-        margin: 0 0 8px;
-      }
-      p {
-        color: var(--muted);
-        font-size: 18px;
-      }
-    </style>
+    <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <main>
-      <h1 class="title">Game screen</h1>
-      <p>Arrives in Phase 3. Phones will join this screen in Phase 2.</p>
-      <p><a href="/">Back to the dev hub</a></p>
+    <div class="kerb"></div>
+
+    <header class="top">
+      <h1 class="title">Kart Racer</h1>
+      <span class="phase">Phase 2 · phones linked, no racing yet</span>
+      <span id="server-chip" class="chip">connecting…</span>
+    </header>
+
+    <main class="layout">
+      <!-- Join panel: QR code + room code -->
+      <section class="join" aria-label="Join this game">
+        <h2>Scan to join</h2>
+        <div id="qr" class="qr" aria-label="QR code to join"></div>
+        <div class="code-label">Room code</div>
+        <div id="room-code" class="room-code">····</div>
+        <p id="join-url" class="join-url"></p>
+        <p id="join-warning" class="join-warning" hidden></p>
+      </section>
+
+      <!-- One card per player slot, filled in by main.js -->
+      <section id="players" class="players" aria-label="Players"></section>
     </main>
+
+    <footer id="footer" class="footer"></footer>
+
+    <div id="banner" class="banner" role="alert" hidden></div>
+
+    <template id="player-card">
+      <article class="card empty">
+        <div class="card-head">
+          <span class="badge"></span>
+          <span class="status"></span>
+        </div>
+        <div class="card-body">
+          <svg class="wheel" viewBox="-100 -100 200 200" aria-hidden="true">
+            <g class="rotor">
+              <circle r="80" class="rim" />
+              <path d="M -20 0 H -74 M 20 0 H 74 M 0 20 V 74" class="spoke" />
+              <circle r="22" class="hub" />
+              <rect x="-7" y="-96" width="14" height="28" rx="4" class="mark" />
+            </g>
+          </svg>
+          <div class="readout">
+            <div class="value">+0.00</div>
+            <div class="bar"><div class="bar-centre"></div><div class="bar-fill"></div></div>
+          </div>
+        </div>
+        <dl class="stats">
+          <div><dt>Messages</dt><dd class="rate">–</dd></div>
+          <div><dt>Phone ⇄ server</dt><dd class="phone-rtt">–</dd></div>
+          <div><dt>Tilt → screen</dt><dd class="latency">–</dd></div>
+          <div><dt>Last input</dt><dd class="age">–</dd></div>
+        </dl>
+        <p class="empty-hint"></p>
+      </article>
+    </template>
+
+    <script type="module" src="./main.js"></script>
   </body>
 </html>

@@ -36,3 +36,31 @@ A short log of design choices. Newest at the bottom. Each entry: what we chose, 
 **Chose:** when the phone is too flat to read (less than ~0.35 of gravity in the screen plane), steering eases back to 0.
 **Instead of:** holding the last value.
 **Why:** a player who puts the phone down shouldn't keep turning at full lock.
+
+## 7. Plain WebSockets with `ws` (Phase 2)
+
+**Chose:** the `ws` library on the server, the browser's built-in `WebSocket` on the clients, our own small reconnect wrapper (`shared/net.js`).
+**Instead of:** Socket.IO (adds its own protocol and reconnect logic) or WebRTC data channels (lower latency in theory, but needs a signalling step and is much harder to debug).
+**Why:** you see and own every piece: how reconnecting works, how a dead link is noticed, what's on the wire. On home Wi-Fi a WebSocket already lands well under the 50 ms target. WebRTC stays a stretch goal.
+
+## 8. Relay lives inside the dev server (Phase 2)
+
+**Chose:** attach the relay to Vite's HTTPS server at `/ws`.
+**Instead of:** a second server on another port.
+**Why:** phones already accepted that address's certificate when loading the page. A second port would need a second certificate approval, and the pages would need to know another address. `server/index.js` still runs the relay on its own for deployment.
+
+## 9. Fixed 60 Hz input stream (Phase 2)
+
+**Chose:** phones send `{ steer, seq }` on a 60 Hz timer.
+**Instead of:** sending on every sensor event, or only when the value changes.
+**Why:** sensor rates vary by phone, and "only on change" makes a silent phone indistinguishable from a dead one. A steady stream is predictable for physics and doubles as a liveness signal.
+
+## 10. Who's who: player id per tab, room token per game screen (Phase 2)
+
+**Chose:** each controller tab makes a random `playerId` (sessionStorage); each game screen keeps its room `code` + secret `token` (sessionStorage). Dropped players and rooms are held for 60 s.
+**Why:** reconnects and reloads land back in the same slot or room without accounts or logins. Per tab, not per browser, so two tabs on one laptop can be two players while testing. The token stops another screen from taking over a room just by knowing its code.
+
+## 11. Recover from server restarts (Phase 2)
+
+**Chose:** a game screen that reconnects to a server with no memory of its room recreates it under the same code; phones retry "no such room" every 2 s and ask for their previous slot.
+**Why:** the dev server restarts whenever its config changes, and a deployed server will restart on every update. Players shouldn't have to rescan, and shouldn't swap colours mid-session.

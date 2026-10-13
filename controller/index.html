@@ -17,9 +17,22 @@
       <div class="start-inner">
         <h1 class="title">Kart Controller</h1>
         <p class="lead">Hold your phone sideways, screen facing you, like a steering wheel.</p>
+        <label class="room-field">
+          <span>Room code</span>
+          <input
+            id="room-input"
+            maxlength="4"
+            placeholder="ABCD"
+            autocomplete="off"
+            autocapitalize="characters"
+            autocorrect="off"
+            spellcheck="false"
+            enterkeyhint="go"
+          />
+        </label>
         <button id="start-btn" class="btn">Tap to start</button>
         <p id="start-error" class="error" role="alert" hidden></p>
-        <p class="fine">Phase 1 · steering only. Joining a game comes in Phase 2.</p>
+        <p class="fine">The code is on the game screen. Leave it empty to practise steering on your own.</p>
       </div>
     </section>
 
@@ -29,7 +42,7 @@
         <button id="recenter-btn" class="btn">Recenter</button>
         <div class="chips">
           <span id="chip-source" class="chip">waiting for sensor</span>
-          <span id="chip-rate" class="chip">0 Hz</span>
+          <span id="chip-net" class="chip">practice · no room</span>
           <span id="chip-awake" class="chip">screen may sleep</span>
         </div>
         <button id="tune-btn" class="btn secondary">Tune</button>

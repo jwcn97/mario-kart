@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { networkInterfaces } from 'node:os';
 import { resolve } from 'node:path';
-import qrcode from 'qrcode-terminal';
+import { attachRelay } from './server/attach.js';
 
 const root = import.meta.dirname;
 
@@ -20,48 +20,57 @@ function describeDevice(userAgent = '') {
   return 'desktop';
 }
 
-/**
- * Dev-only helpers:
- *  - logs every page visit, so you can see your phone reach the laptop
- *  - prints a QR code for the controller page once the server is up
- */
-function kartDevHelpers() {
-  return {
-    name: 'kart-dev-helpers',
-    apply: 'serve',
-    configureServer(server) {
-      server.middlewares.use((req, _res, next) => {
-        const wantsPage = req.method === 'GET' && (req.headers.accept || '').includes('text/html');
-        if (wantsPage) {
-          const ip = (req.socket.remoteAddress || '?').replace('::ffff:', '');
-          const time = new Date().toLocaleTimeString();
-          console.log(`[visit] ${time}  ${req.url}  from ${ip} (${describeDevice(req.headers['user-agent'])})`);
-        }
-        next();
-      });
+/** Shared by `vite` (dev) and `vite preview` (production build). */
+function addKartMiddleware(server) {
+  server.middlewares.use((req, res, next) => {
+    // The game screen asks this when it's opened on localhost, so the QR code it
+    // shows points phones at an address they can actually reach.
+    if (req.url === '/__kart/lan') {
+      const port = req.socket.localPort;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ origins: lanAddresses().map((ip) => `https://${ip}:${port}`) }));
+      return;
+    }
 
-      server.httpServer?.once('listening', () => {
-        const address = server.httpServer.address();
-        const port = typeof address === 'object' && address ? address.port : server.config.server.port;
-        const [ip] = lanAddresses();
-        if (!ip) {
-          console.log('\n  No Wi-Fi/LAN address found. Connect this computer to the same network as your phone.\n');
-          return;
-        }
-        const url = `https://${ip}:${port}/controller/`;
-        // Wait a beat so this prints after Vite's own startup banner.
-        setTimeout(() => {
-          console.log(`\n  Phone controller: ${url}`);
-          console.log('  Scan this with your phone camera (same Wi-Fi as this computer):\n');
-          qrcode.generate(url, { small: true });
-        }, 150);
-      });
-    },
+    // Log page visits, so you can see each phone reach this computer.
+    const wantsPage = req.method === 'GET' && (req.headers.accept || '').includes('text/html');
+    if (wantsPage) {
+      const ip = (req.socket.remoteAddress || '?').replace('::ffff:', '');
+      const time = new Date().toLocaleTimeString();
+      console.log(`[visit] ${time}  ${req.url}  from ${ip} (${describeDevice(req.headers['user-agent'])})`);
+    }
+    next();
+  });
+
+  if (server.httpServer) {
+    // The relay (rooms + WebSockets) lives on the same HTTPS server at /ws.
+    attachRelay(server.httpServer, { log: (line) => console.log(`[relay] ${line}`) });
+
+    server.httpServer.once('listening', () => {
+      const address = server.httpServer.address();
+      const port = typeof address === 'object' && address ? address.port : 5173;
+      const [ip] = lanAddresses();
+      setTimeout(() => {
+        console.log('\n  Game screen (laptop / TV):');
+        console.log(`    https://localhost:${port}/game/`);
+        if (ip) console.log(`    https://${ip}:${port}/game/   (from another device)`);
+        else console.log('    No Wi-Fi address found: phones won’t be able to connect.');
+        console.log('  Phones join by scanning the QR code on the game screen.\n');
+      }, 150);
+    });
+  }
+}
+
+function kartServer() {
+  return {
+    name: 'kart-server',
+    configureServer: addKartMiddleware,
+    configurePreviewServer: addKartMiddleware,
   };
 }
 
 export default defineConfig({
-  plugins: [basicSsl(), kartDevHelpers()],
+  plugins: [basicSsl(), kartServer()],
   server: {
     host: true, // listen on the LAN, not just localhost, so phones can connect
     port: 5173,

@@ -9,6 +9,7 @@ Everything written down about how this game works and why it's built this way. C
 | [decisions.md](decisions.md) | Short log of design choices and the reasoning behind them |
 | [phase-0-setup.md](phase-0-setup.md) | Dev server, HTTPS on your phone, troubleshooting |
 | [phase-1-steering.md](phase-1-steering.md) | How phone tilt becomes a steering value, step by step |
+| [phase-2-networking.md](phase-2-networking.md) | Rooms, the message protocol, reconnects, measuring lag |
 
 ## Conventions
 

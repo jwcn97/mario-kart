@@ -10,7 +10,7 @@ The full plan (what to learn in each phase, with resources) lives in the shared 
 | --- | --- | --- | --- | --- |
 | 0 | Setup and a page on your phone | 2–3 h | Built, check on phone | Phone shows the page over HTTPS; the laptop terminal logs each visit |
 | 1 | Turn phone tilt into a steering value | 4–6 h | Built, check on phone | Level reads ~0, a comfortable tilt reaches ±1, no jitter when held still |
-| 2 | Link phones to the game screen (WebSockets, rooms) | 5–7 h | Not started | Two phones join by QR; each tilt moves its own dial on the shared screen; reconnects after the phone locks |
+| 2 | Link phones to the game screen (WebSockets, rooms) | 5–7 h | Built, check on phones | Two phones join by QR; each tilt moves its own dial on the shared screen; reconnects after the phone locks |
 | 3 | 3D world and a kart that drives (Three.js) | 8–12 h | Not started | Two players drive their own karts at once; keyboard still works |
 | 4 | A real track with laps | 8–10 h | Not started | Finish a 3-lap race; corner cutting doesn't count; wrong-way warning |
 | 5 | Kart feel: drift, boost, juice | 8–12 h | Not started | A friend drives 3 laps and asks to go again |

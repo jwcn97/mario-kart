@@ -83,24 +83,24 @@
       <p class="lead">Dev hub. The game runs on one shared screen; every player's phone is a tilt-to-steer wheel.</p>
 
       <div class="cards">
-        <a class="card" href="/controller/">
-          <span class="tag">PHASE 1 · READY</span>
-          <h2>Phone controller</h2>
-          <p>Reads your phone's tilt and turns it into a steering value from −1 to +1.</p>
-        </a>
         <a class="card" href="/game/">
-          <span class="tag later">PHASE 3 · LATER</span>
+          <span class="tag">PHASE 2 · READY</span>
           <h2>Game screen</h2>
-          <p>The shared race view for a laptop, TV or tablet.</p>
+          <p>Opens a room with a QR code. Shows each joined phone's live steering and connection stats.</p>
+        </a>
+        <a class="card" href="/controller/">
+          <span class="tag">PHASE 2 · READY</span>
+          <h2>Phone controller</h2>
+          <p>Turns your phone's tilt into steering from −1 to +1 and streams it to the game screen.</p>
         </a>
       </div>
 
       <section class="steps">
-        <h2>Open the controller on your phone</h2>
+        <h2>Play with phones</h2>
         <ol>
-          <li>Put your phone on the same Wi-Fi as this computer.</li>
-          <li>Scan the QR code printed in the terminal after <code>npm run dev</code>.</li>
-          <li>Accept the certificate warning once (it's your own dev certificate).</li>
+          <li>Open the <a href="/game/">game screen</a> on this computer (or a TV or tablet).</li>
+          <li>Put each phone on the same Wi-Fi and scan the QR code on the game screen.</li>
+          <li>Accept the certificate warning once per phone (it's your own dev certificate).</li>
         </ol>
       </section>
     </main>

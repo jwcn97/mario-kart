@@ -14,10 +14,10 @@ npm run dev      # starts the HTTPS dev server
 The terminal prints:
 
 1. Vite's own URLs (`Local` and `Network`).
-2. A **QR code** for `https://<your-computer's-LAN-IP>:5173/controller/`.
+2. The **game screen** address, for this computer and for other devices.
 3. A `[visit]` line every time any device opens a page, with its IP and whether it's iOS, Android or desktop.
 
-Scan the QR code with your phone's camera. Your phone must be on the **same Wi-Fi** as the computer.
+Open the game screen and scan its QR code with your phone's camera (from Phase 2; in Phase 0 the QR code was printed in the terminal). Your phone must be on the **same Wi-Fi** as the computer.
 
 ## The certificate warning (expected)
 
@@ -36,7 +36,7 @@ After that the address bar says "Not secure" instead of showing a padlock. The p
 | --- | --- |
 | `basicSsl()` plugin | Generates the self-signed certificate so the server speaks HTTPS |
 | `server.host: true` | Listens on your Wi-Fi address, not just `localhost`, so phones can reach it |
-| `kartDevHelpers()` plugin | Logs page visits and prints the controller QR code |
+| `kartServer()` plugin | Logs page visits, prints the game screen address, and (from Phase 2) runs the relay at `/ws` |
 
 It also lists the three pages (`index.html`, `controller/`, `game/`) so `npm run build` bundles all of them.
 
@@ -46,12 +46,12 @@ It also lists the three pages (`index.html`, `controller/`, `game/`) so `npm run
 | --- | --- |
 | Phone can't load the page at all | Same Wi-Fi? Some office, school and guest networks block devices from talking to each other: try your phone's hotspot with the computer joined to it. |
 | macOS asks whether `node` may accept incoming connections | Click **Allow**. If you clicked Deny: System Settings → Network → Firewall → Options. |
-| No QR code printed | The computer has no LAN address: connect it to Wi-Fi. |
-| QR code points at the wrong address | You have several network adapters (VPN, Docker). Use the `Network` URL Vite prints that matches your Wi-Fi. |
+| Game screen warns it has no Wi-Fi address | The computer has no LAN address: connect it to Wi-Fi. |
+| QR code points at the wrong address | You have several network adapters (VPN, Docker). Open the game screen using the `Network` URL Vite prints that matches your Wi-Fi; the QR code then uses that address. |
 | Want no warning at all | Use [mkcert](https://github.com/FiloSottile/mkcert): `mkcert -install`, `mkcert <your-LAN-IP> localhost`, point `server.https` in `vite.config.js` at the generated key and cert, and install mkcert's root certificate on the phone (on iPhone also enable it under Settings → General → About → Certificate Trust Settings). |
 
 ## Done when
 
-- [ ] `npm run dev` prints a QR code.
+- [ ] `npm run dev` prints the game screen address.
 - [ ] Your phone opens the controller page over `https://`.
 - [ ] The terminal shows a `[visit] … (iOS)` or `(Android)` line for your phone.
