@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#101216" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>Kart Controller</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/shared/theme.css" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <!-- 1. Start screen: the tap here is what lets us ask for sensor permission -->
+    <section id="start" class="screen start">
+      <div class="kerb"></div>
+      <div class="start-inner">
+        <h1 class="title">Kart Controller</h1>
+        <p class="lead">Hold your phone sideways, screen facing you, like a steering wheel.</p>
+        <button id="start-btn" class="btn">Tap to start</button>
+        <p id="start-error" class="error" role="alert" hidden></p>
+        <p class="fine">Phase 1 · steering only. Joining a game comes in Phase 2.</p>
+      </div>
+    </section>
+
+    <!-- 2. Play screen: live steering readout -->
+    <section id="play" class="screen play" hidden>
+      <header class="topbar">
+        <button id="recenter-btn" class="btn">Recenter</button>
+        <div class="chips">
+          <span id="chip-source" class="chip">waiting for sensor</span>
+          <span id="chip-rate" class="chip">0 Hz</span>
+          <span id="chip-awake" class="chip">screen may sleep</span>
+        </div>
+        <button id="tune-btn" class="btn secondary">Tune</button>
+      </header>
+
+      <main class="stage">
+        <svg class="wheel" viewBox="-100 -100 200 200" aria-hidden="true">
+          <g id="wheel-rotor">
+            <circle r="84" class="wheel-rim" />
+            <path d="M -22 0 H -78 M 22 0 H 78 M 0 22 V 78" class="wheel-spoke" />
+            <circle r="24" class="wheel-hub" />
+            <rect x="-7" y="-98" width="14" height="28" rx="4" class="wheel-mark" />
+          </g>
+        </svg>
+
+        <div class="readout">
+          <div id="direction" class="direction">Straight</div>
+          <div id="value" class="value">+0.00</div>
+          <div class="bar" aria-hidden="true">
+            <div class="bar-centre"></div>
+            <div id="bar-fill" class="bar-fill"></div>
+          </div>
+          <div class="bar-labels"><span>−1 left</span><span>right +1</span></div>
+        </div>
+      </main>
+
+      <p id="notice" class="notice" role="status" hidden></p>
+      <pre id="debug" class="debug"></pre>
+    </section>
+
+    <!-- Shown over the play screen when a phone is held upright -->
+    <div class="rotate-hint">
+      <div class="rotate-phone"></div>
+      <p>Turn your phone sideways</p>
+    </div>
+
+    <!-- 3. Tuning sheet: sliders for the steering pipeline -->
+    <div id="sheet" class="sheet" hidden>
+      <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+        <div class="sheet-head">
+          <h2 id="sheet-title">Tune steering</h2>
+          <button id="sheet-close" class="btn secondary small">Done</button>
+        </div>
+        <div id="sliders" class="sliders"></div>
+        <div class="sheet-foot">
+          <label class="toggle"><input id="invert" type="checkbox" /> Invert steering</label>
+          <button id="reset-btn" class="btn secondary small">Reset defaults</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

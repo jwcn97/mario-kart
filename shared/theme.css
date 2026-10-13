@@ -1,0 +1,69 @@
+/* Shared look for every page: hub, controller and (later) the game screen. */
+:root {
+  --bg: #101216;
+  --surface: #1a1d23;
+  --surface-2: #242830;
+  --line: #333843;
+  --text: #f3f2ee;
+  --muted: #9aa1ab;
+  --accent: #ffc400; /* kerb yellow */
+  --accent-ink: #1a1400;
+  --danger: #ff5a4f; /* kerb red */
+  --ok: #4fd18b;
+  --radius: 14px;
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+}
+
+.title {
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.kerb {
+  height: 8px;
+  background: repeating-linear-gradient(90deg, var(--danger) 0 24px, var(--text) 24px 48px);
+}
+
+.btn {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 14px 28px;
+  font: 800 18px/1 var(--font);
+  letter-spacing: 0.02em;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn.secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+}

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kart Racer Dev Hub</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/shared/theme.css" />
+    <style>
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 48px 16px;
+      }
+      h1 {
+        font-size: clamp(36px, 8vw, 64px);
+        margin: 16px 0 8px;
+      }
+      .lead {
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.5;
+        margin: 0 0 32px;
+      }
+      .cards {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      }
+      .card {
+        display: block;
+        padding: 20px;
+        border-radius: var(--radius);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        color: var(--text);
+        text-decoration: none;
+      }
+      .card:hover {
+        border-color: var(--accent);
+      }
+      .card h2 {
+        margin: 0 0 6px;
+        font-size: 20px;
+      }
+      .card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+      .tag {
+        display: inline-block;
+        margin-bottom: 10px;
+        font: 700 12px/1 var(--mono);
+        color: var(--accent);
+      }
+      .tag.later {
+        color: var(--muted);
+      }
+      .steps {
+        margin-top: 32px;
+        padding: 20px;
+        border-radius: var(--radius);
+        background: var(--surface);
+        line-height: 1.6;
+      }
+      .steps h2 {
+        margin: 0 0 8px;
+        font-size: 18px;
+      }
+      code {
+        font-family: var(--mono);
+        background: var(--surface-2);
+        padding: 1px 6px;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="kerb"></div>
+    <main>
+      <h1 class="title">Kart Racer</h1>
+      <p class="lead">Dev hub. The game runs on one shared screen; every player's phone is a tilt-to-steer wheel.</p>
+
+      <div class="cards">
+        <a class="card" href="/controller/">
+          <span class="tag">PHASE 1 · READY</span>
+          <h2>Phone controller</h2>
+          <p>Reads your phone's tilt and turns it into a steering value from −1 to +1.</p>
+        </a>
+        <a class="card" href="/game/">
+          <span class="tag later">PHASE 3 · LATER</span>
+          <h2>Game screen</h2>
+          <p>The shared race view for a laptop, TV or tablet.</p>
+        </a>
+      </div>
+
+      <section class="steps">
+        <h2>Open the controller on your phone</h2>
+        <ol>
+          <li>Put your phone on the same Wi-Fi as this computer.</li>
+          <li>Scan the QR code printed in the terminal after <code>npm run dev</code>.</li>
+          <li>Accept the certificate warning once (it's your own dev certificate).</li>
+        </ol>
+      </section>
+    </main>
+  </body>
+</html>
