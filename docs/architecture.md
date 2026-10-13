@@ -16,7 +16,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | Controller page | Each player's phone browser | Read the gyro and buttons, send input, show a mini HUD | Phase 1 (steering), Phase 2 (joins a room, streams input) |
 | Relay server | Inside the dev server during development; a small host when shipped | Pair phones with a game by room code, forward messages | Phase 2 |
-| Game screen | Any big-screen browser | 3D world, kart physics, cameras, HUD; race rules from Phase 4 | Phase 2 (room + QR), Phase 3 (driving) |
+| Game screen | Any big-screen browser | 3D world, kart physics, race rules, cameras, HUD | Phase 2 (room + QR), Phase 3 (driving), Phase 4 (racing) |
 
 Why a server in the middle: browsers can't open a direct connection to each other without help, and a server gives one place to manage rooms, player slots and reconnects. It holds no game logic; that all lives on the game screen. Message list and reconnect rules: [phase-2-networking.md](phase-2-networking.md).
 
@@ -32,12 +32,14 @@ mario-kart/
 │   └── style.css
 ├── game/                 Shared game screen
 │   ├── index.html
-│   ├── main.js           Wires it together: room + QR, karts per player, loop, HUD
-│   ├── physics.js        Arcade kart model and collisions (no Three.js), unit-tested
+│   ├── main.js           Wires it together: room + QR, karts, loop, race screens, HUD
+│   ├── physics.js        Arcade kart model, grass, barriers, collisions (no Three.js), unit-tested
 │   ├── loop.js           Fixed 120 Hz timestep with interpolation, unit-tested
 │   ├── input.js          Phone + keyboard input, whichever is active, unit-tested
-│   ├── course.js         Arena size, start grid, obstacle layout (plain data)
-│   ├── world.js          Three.js scene: ground, walls, obstacles, kart models, cameras
+│   ├── track.js          Track layout, spline, locating karts, start grid (no Three.js), unit-tested
+│   ├── race.js           Countdown, checkpoints, laps, timing, standings (no browser), unit-tested
+│   ├── world.js          Three.js scene: track ribbons, gantry, trees, kart models, cameras
+│   ├── minimap.js        Top-down 2D map with a dot per kart
 │   └── style.css
 ├── server/
 │   ├── relay.js          Room and player rules (no networking), unit-tested

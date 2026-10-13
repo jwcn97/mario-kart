@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   KART_PARAMS as P,
   collideKarts,
-  collideWithArena,
+  collideWithBarriers,
   collideWithObstacle,
   createKart,
   forwardOf,
@@ -14,7 +14,9 @@ import {
   turnGrip,
 } from '../game/physics.js';
 import { createFixedStep } from '../game/loop.js';
+import { buildTrack } from '../game/track.js';
 
+const track = buildTrack();
 const DT = 1 / 120;
 const close = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, `expected ${b}, got ${a}`);
 
@@ -103,21 +105,41 @@ test('a full right-hand circle at steady speed brings the kart back where it sta
 
 // ---------- Collisions ----------
 
-test('arena walls stop the kart and bounce it back a little', () => {
-  const arena = { halfWidth: 10, halfDepth: 10 };
-  const kart = createKart({ z: 9.5 }); // facing +z, into the far wall
-  kart.speed = 20;
-  assert.ok(collideWithArena(kart, arena));
-  close(kart.z, 10 - P.radius);
-  close(kart.speed, -20 * P.wallBounce);
+test('grass slows a fast kart down to the off-road limit, then holds it there', () => {
+  let v = P.maxSpeed;
+  for (let t = 0; t < 2; t += DT) v = nextSpeed(v, { gas: true }, DT, P, true);
+  close(v, P.offRoadMaxSpeed, 1e-9);
+  // Slow karts on grass aren't affected.
+  assert.equal(nextSpeed(5, {}, DT, P, true), nextSpeed(5, {}, DT, P, false));
 });
 
-test('scraping along a wall keeps some speed', () => {
-  const arena = { halfWidth: 10, halfDepth: 10 };
-  const kart = createKart({ x: 9.5, heading: Math.PI / 6 }); // mostly along the wall, a bit into it
+/** A kart on the track at sample i, `lateral` m from the centre, facing `angle` off the direction of travel. */
+function kartOnTrack(i, lateral, angle = 0) {
+  const c = track.samples[i];
+  const heading = Math.atan2(c.tx, c.tz) + angle;
+  return createKart({ x: c.x + c.rx * lateral, z: c.z + c.rz * lateral, heading });
+}
+
+test('the right-hand barrier stops a kart and bounces it back towards the road', () => {
+  const kart = kartOnTrack(100, 15.5, -Math.PI / 2); // turned to face the right wall
   kart.speed = 20;
-  collideWithArena(kart, arena);
-  assert.ok(kart.speed > 10, `speed after scraping: ${kart.speed}`);
+  const where = track.locate(kart.x, kart.z);
+  assert.ok(collideWithBarriers(kart, where));
+  const after = track.locate(kart.x, kart.z);
+  close(after.lateral, where.barrierRight - P.radius, 0.05);
+  assert.ok(kart.speed < 0, 'bounced back');
+});
+
+test('scraping along a barrier keeps most of your speed', () => {
+  const kart = kartOnTrack(100, -15.5, Math.PI / 12); // nearly along the track, drifting into the left wall
+  kart.speed = 20;
+  assert.ok(collideWithBarriers(kart, track.locate(kart.x, kart.z)));
+  assert.ok(kart.speed > 15, `speed after scraping: ${kart.speed}`);
+});
+
+test('no barrier hit in the middle of the road', () => {
+  const kart = kartOnTrack(100, 2);
+  assert.equal(collideWithBarriers(kart, track.locate(kart.x, kart.z)), false);
 });
 
 test('round obstacles push the kart out', () => {
@@ -140,18 +162,30 @@ test('rear-ending a kart shoves it forward and slows you down', () => {
   assert.ok(slow.z - fast.z >= 2 * P.radius - 1e-9, 'pushed apart');
 });
 
-test('stepWorld moves every kart and reports who hit something', () => {
+test('stepWorld moves every kart, tracks where it is, and reports who hit something', () => {
   const world = {
-    karts: new Map([
-      [1, createKart({ x: -5 })],
-      [2, createKart({ x: 5, z: 9.5 })],
-    ]),
-    arena: { halfWidth: 10, halfDepth: 10 },
+    track,
     obstacles: [],
+    karts: new Map([
+      [1, kartOnTrack(50, 0)],
+      [2, kartOnTrack(300, 15.5, Math.PI / 2)], // pointing straight at the left wall
+    ]),
   };
+  world.karts.get(2).speed = 15;
   const hits = stepWorld(world, () => ({ gas: true }), DT);
   assert.ok(world.karts.get(1).speed > 0);
   assert.deepEqual([...hits], [2]);
+  assert.ok(Math.abs(world.karts.get(1).where.index - 50) <= 1);
+  assert.equal(world.karts.get(1).offRoad, false);
+});
+
+test('a kart on the grass is marked off-road and slowed', () => {
+  const kart = kartOnTrack(50, 12);
+  kart.speed = P.maxSpeed;
+  const world = { track, obstacles: [], karts: new Map([[1, kart]]) };
+  for (let t = 0; t < 1; t += DT) stepWorld(world, () => ({ gas: true }), DT);
+  assert.equal(kart.offRoad, true);
+  assert.ok(kart.speed < 14, `speed on grass after 1 s: ${kart.speed}`);
 });
 
 test('interpolation draws between the last two steps, the short way round', () => {

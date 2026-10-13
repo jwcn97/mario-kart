@@ -3,12 +3,15 @@
  *
  *   relay (Phase 2) ─► InputHub ◄─ keyboard
  *                         │
- *          fixed 120 Hz physics (physics.js)
+ *          fixed 120 Hz physics on the track (physics.js, track.js)
  *                         │
- *          Three.js world draws it every frame (world.js), plus the HUD
+ *          race rules: countdown, laps, standings (race.js)
+ *                         │
+ *          Three.js world draws it every frame (world.js), plus HUD and minimap
  *
  * Every player in the room gets a kart. Arrows drive P1 and W A S D drive P2,
  * so you can test without phones; holding keys overrides that player's phone.
+ * Space starts a race.
  */
 import QRCode from 'qrcode';
 import { ERRORS, PLAYERS, playerInfo } from '../shared/protocol.js';
@@ -17,11 +20,14 @@ import { relayUrl } from '../shared/relay-url.js';
 import { createKart, interpolate, stepWorld } from './physics.js';
 import { createFixedStep } from './loop.js';
 import { InputHub } from './input.js';
-import { ARENA, OBSTACLES, startPosition } from './course.js';
+import { buildTrack } from './track.js';
+import { Race, formatTime } from './race.js';
 import { World } from './world.js';
+import { Minimap } from './minimap.js';
 
 const ROOM_KEY = 'kart.game.room'; // remembers our room across reloads
 const STALE_INPUT_MS = 500;
+const NO_INPUT = Object.freeze({ steer: 0, gas: false, brake: false, source: 'none' });
 
 const $ = (id) => document.getElementById(id);
 
@@ -36,8 +42,15 @@ const players = new Map(
 );
 
 const input = new InputHub({ staleMs: STALE_INPUT_MS });
-const physics = { karts: new Map(), arena: ARENA, obstacles: OBSTACLES };
-const world = new World($('scene'));
+const track = buildTrack();
+// ?laps=1 on the game screen's address for quick test races.
+const lapsParam = Number(new URLSearchParams(location.search).get('laps'));
+const race = new Race(track, Number.isInteger(lapsParam) && lapsParam >= 1 && lapsParam <= 20 ? { laps: lapsParam } : {});
+const physics = { karts: new Map(), track, obstacles: [] };
+const world = new World($('scene'), track);
+const minimap = new Minimap($('minimap'), track);
+const RECORD_KEY = `kart.record.${track.name}`;
+let record = loadRecord(); // fastest lap ever on this track, on this screen
 
 let room = loadRoom();
 let fatal = null;
@@ -58,6 +71,22 @@ function saveRoom(value) {
   }
 }
 
+function loadRecord() {
+  try {
+    return JSON.parse(localStorage.getItem(RECORD_KEY)) || null;
+  } catch {
+    return null;
+  }
+}
+
+function saveRecord(value) {
+  try {
+    localStorage.setItem(RECORD_KEY, JSON.stringify(value));
+  } catch {
+    // fine: the record just won't survive a reload
+  }
+}
+
 // ---------- Karts come and go with players ----------
 
 /** A slot gets a kart while a phone holds it, or once the keyboard has driven it. */
@@ -65,7 +94,7 @@ function syncKarts() {
   for (const { slot } of PLAYERS) {
     const wanted = players.get(slot).present || input.keyboardUsed.has(slot);
     if (wanted && !physics.karts.has(slot)) {
-      physics.karts.set(slot, createKart(startPosition(slot)));
+      physics.karts.set(slot, createKart(track.gridPosition(slot)));
       world.addKart(slot, playerInfo(slot));
     } else if (!wanted && physics.karts.has(slot)) {
       physics.karts.delete(slot);
@@ -74,8 +103,27 @@ function syncKarts() {
   }
 }
 
+/** Everyone back to their grid box, standing still. */
 function resetKarts() {
-  for (const slot of physics.karts.keys()) physics.karts.set(slot, createKart(startPosition(slot)));
+  for (const slot of physics.karts.keys()) physics.karts.set(slot, createKart(track.gridPosition(slot)));
+}
+
+function startRace() {
+  if (physics.karts.size === 0) {
+    toast('Join with a phone (or press ↑) first, then start the race.');
+    return;
+  }
+  resetKarts();
+  $('results').hidden = true;
+  $('alerts').replaceChildren();
+  race.start(physics.karts);
+}
+
+function backToPractice() {
+  race.stop();
+  resetKarts();
+  $('results').hidden = true;
+  $('alerts').replaceChildren();
 }
 
 // ---------- Connection to the relay ----------
@@ -187,18 +235,28 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (e.repeat) return;
+  if ((e.code === 'Space' || e.code === 'Enter') && (race.phase === 'practice' || race.phase === 'finished')) {
+    e.preventDefault();
+    startRace();
+  }
   if (e.code === 'KeyC') $('camera-chip').textContent = world.cycleCamera();
-  if (e.code === 'KeyR') resetKarts();
+  if (e.code === 'KeyR') backToPractice();
+  if (e.code === 'KeyG') toast(world.toggleGates() ? 'Showing checkpoint gates' : 'Checkpoint gates hidden');
   if (e.code === 'KeyQ') $('join').hidden = !$('join').hidden;
   if (e.code === 'KeyI') $('debug').hidden = !$('debug').hidden;
 });
 window.addEventListener('keyup', (e) => input.keyUp(e.code));
 window.addEventListener('blur', () => input.releaseAllKeys()); // we'd never see those key-ups
+$('start-race').addEventListener('click', (e) => {
+  e.currentTarget.blur(); // so Space doesn't "click" it again later
+  startRace();
+});
 
 // ---------- Physics: fixed 120 Hz steps ----------
 
 let frameNow = performance.now();
 const lastInput = new Map(); // slot -> input used in the latest step (for the HUD and wheels)
+const raceEvents = []; // filled by physics steps, shown on the next frame
 
 const loop = createFixedStep({
   stepHz: 120,
@@ -207,12 +265,14 @@ const loop = createFixedStep({
     stepWorld(
       physics,
       (slot) => {
-        const i = input.get(slot, frameNow);
+        // During the countdown everyone waits on the line.
+        const i = race.frozen ? NO_INPUT : input.get(slot, frameNow);
         lastInput.set(slot, i);
         return i;
       },
       dt,
     );
+    raceEvents.push(...race.update(dt, physics.karts));
   },
 });
 
@@ -233,8 +293,14 @@ for (const p of PLAYERS) {
     fill: chip.querySelector('.steer-fill'),
     gas: chip.querySelector('.gas'),
     brake: chip.querySelector('.brake'),
+    place: chip.querySelector('.place'),
+    lap: chip.querySelector('.lap'),
+    laptime: chip.querySelector('.laptime'),
+    best: chip.querySelector('.best'),
   });
 }
+
+const ordinal = (n) => `${n}<sup>${{ 1: 'st', 2: 'nd', 3: 'rd' }[n] ?? 'th'}</sup>`;
 
 const ms = (n) => (n === null || n === undefined ? '–' : `${Math.round(n)} ms`);
 
@@ -264,7 +330,161 @@ function renderHud() {
     ui.fill.style.width = `${width}%`;
     ui.gas.classList.toggle('on', i.gas);
     ui.brake.classList.toggle('on', i.brake);
+
+    // Race info: place, lap, lap time, best lap. Late joiners sit this race out.
+    const racer = race.racers.get(slot);
+    ui.chip.classList.toggle('spectating', !racer);
+    ui.chip.style.order = racer ? places.get(slot) ?? 9 : 9;
+    if (!racer) {
+      ui.lap.textContent = race.phase === 'practice' ? '' : 'next race';
+      continue;
+    }
+    ui.place.innerHTML = racer.dnf ? 'DNF' : ordinal(places.get(slot));
+    ui.lap.textContent = racer.finishTime !== null ? 'Finished' : `Lap ${race.currentLap(slot)}/${race.rules.laps}`;
+    ui.laptime.textContent = formatTime(racer.finishTime ?? race.currentLapTime(slot));
+    ui.best.textContent = `best ${formatTime(racer.bestLap)}`;
   }
+}
+
+let places = new Map(); // slot -> current place, refreshed every frame
+
+// ---------- Race screens ----------
+
+function renderRacePanel() {
+  const panel = $('race-panel');
+  const title = $('race-title');
+  const sub = $('race-sub');
+  const button = $('start-race');
+  const recordText = record ? `Lap record ${formatTime(record.time)} (${record.name})` : 'No lap record yet';
+  document.body.classList.toggle('practice', race.phase === 'practice');
+
+  if (race.phase === 'practice') {
+    panel.hidden = false;
+    title.textContent = `Practice · ${track.name}`;
+    sub.textContent = `Space starts a ${race.rules.laps}-lap race · ${recordText}`;
+    button.hidden = false;
+  } else if (race.phase === 'countdown') {
+    panel.hidden = true;
+  } else if (race.phase === 'racing') {
+    panel.hidden = false;
+    const leader = race.standings()[0];
+    title.innerHTML = `Race · <span class="clock">${formatTime(race.time)}</span>`;
+    sub.textContent = leader ? `Leader ${playerInfo(leader.slot).name} · lap ${race.currentLap(leader.slot)}/${race.rules.laps}` : '';
+    button.hidden = true;
+  } else {
+    panel.hidden = true;
+  }
+}
+
+let goUntil = 0;
+
+function renderCountdown(now) {
+  const el = $('countdown');
+  if (race.phase === 'countdown') {
+    el.hidden = false;
+    el.classList.remove('go');
+    el.textContent = String(Math.ceil(race.countdown));
+  } else if (now < goUntil) {
+    el.hidden = false;
+  } else {
+    el.hidden = true;
+  }
+}
+
+/** Alerts: "FINAL LAP" for a moment, "WRONG WAY" while it lasts. Keyed so they don't flicker. */
+const timedAlerts = new Map(); // key -> { text, color, until }
+
+function renderAlerts(now) {
+  const wanted = new Map();
+  for (const [key, a] of timedAlerts) {
+    if (now < a.until) wanted.set(key, { ...a, kind: 'notice' });
+    else timedAlerts.delete(key);
+  }
+  if (race.phase === 'racing') {
+    for (const r of race.racers.values()) {
+      if (r.wrongWay && r.finishTime === null) {
+        wanted.set(`wrong-${r.slot}`, { text: `${playerInfo(r.slot).name} · wrong way`, kind: 'wrong-way' });
+      }
+    }
+  }
+  const box = $('alerts');
+  for (const el of [...box.children]) if (!wanted.has(el.dataset.key)) el.remove();
+  for (const [key, a] of wanted) {
+    if (box.querySelector(`[data-key="${key}"]`)) continue;
+    const el = document.createElement('div');
+    el.className = `alert ${a.kind}`;
+    el.dataset.key = key;
+    if (a.color) el.style.setProperty('--player', a.color);
+    el.textContent = a.text;
+    box.append(el);
+  }
+}
+
+function toast(html, color) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  if (color) el.style.setProperty('--player', color);
+  el.innerHTML = html;
+  $('toasts').append(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+function handleRaceEvents(now) {
+  for (const e of raceEvents.splice(0)) {
+    const who = e.slot ? playerInfo(e.slot) : null;
+    if (e.type === 'go') {
+      goUntil = now + 800;
+      const el = $('countdown');
+      el.textContent = 'GO!';
+      el.classList.remove('go');
+      void el.offsetWidth; // restart the animation
+      el.classList.add('go');
+    } else if (e.type === 'lap') {
+      if (!record || e.lapTime < record.time) {
+        const first = !record;
+        record = { time: e.lapTime, name: who.name };
+        saveRecord(record);
+        if (!first) toast(`New lap record! ${who.name} <b>${formatTime(e.lapTime)}</b>`, who.color);
+      }
+      if (e.lap < race.rules.laps) toast(`${who.name} lap ${e.lap} <b>${formatTime(e.lapTime)}</b>`, who.color);
+      if (e.lap === race.rules.laps - 1) {
+        timedAlerts.set(`final-${e.slot}`, { text: `${who.name} · final lap`, color: who.color, until: now + 2000 });
+      }
+    } else if (e.type === 'finish') {
+      toast(`${who.name} finishes ${ordinal(e.place)} <b>${formatTime(e.time)}</b>`, who.color);
+    } else if (e.type === 'results') {
+      showResults();
+    }
+  }
+}
+
+function showResults() {
+  const rows = race.standings().map((r) => {
+    const p = playerInfo(r.slot);
+    const isRecord = record && r.bestLap !== null && Math.abs(r.bestLap - record.time) < 1e-9;
+    return (
+      `<tr><td class="pos">${r.dnf ? '–' : ordinal(r.place)}</td>` +
+      `<td><span class="badge" style="--player:${p.color}">${p.name}</span></td>` +
+      `<td class="time">${r.dnf ? 'DNF' : formatTime(r.finishTime)}</td>` +
+      `<td class="time ${isRecord ? 'record' : ''}">${formatTime(r.bestLap)}${isRecord ? ' · record' : ''}</td></tr>`
+    );
+  });
+  const winner = race.standings()[0];
+  $('results-title').textContent = winner && !winner.dnf ? `${playerInfo(winner.slot).name} wins!` : 'Results';
+  $('results-rows').innerHTML = rows.join('');
+  $('results').hidden = false;
+}
+
+function renderMinimap() {
+  const leader = race.phase === 'racing' ? race.standings()[0]?.slot : null;
+  minimap.draw(
+    [...physics.karts.entries()].map(([slot, kart]) => ({
+      x: kart.x,
+      z: kart.z,
+      color: playerInfo(slot).color,
+      highlight: slot === leader,
+    })),
+  );
 }
 
 function renderServerChip() {
@@ -331,6 +551,12 @@ function frame(now) {
   world.updateCamera(dt, now / 1000);
   world.render();
 
+  places = new Map(race.standings().map((r) => [r.slot, r.place]));
+  handleRaceEvents(now);
+  renderRacePanel();
+  renderCountdown(now);
+  renderAlerts(now);
+  renderMinimap();
   renderHud();
   renderServerChip();
   renderBanner();
@@ -348,3 +574,6 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+// Development only: poke at the game from the browser console, e.g. kart.race.standings().
+if (import.meta.env.DEV) window.kart = { race, physics, track, input, world };

@@ -23,6 +23,8 @@ export const KART_PARAMS = Object.freeze({
   maxTurnRate: 2.6, // rad/s at the best speed for turning
   fullTurnSpeed: 6, // m/s needed for full steering (no turning on the spot)
   topSpeedTurnLoss: 0.4, // fraction of turning lost at top speed (gentle understeer)
+  offRoadMaxSpeed: 11, // m/s on grass (~40 km/h)
+  offRoadDrag: 30, // m/s² slowdown while faster than that on grass (beats the gas)
   radius: 1.1, // m, for collisions
   wallBounce: 0.25, // 0 = stick to the wall, 1 = perfect bounce
   kartBounce: 0.3,
@@ -42,8 +44,8 @@ export function turnGrip(speed, p = KART_PARAMS) {
   return clamp(s / p.fullTurnSpeed, 0, 1) * (1 - p.topSpeedTurnLoss * clamp(s / p.maxSpeed, 0, 1));
 }
 
-/** Pedals and drag -> new speed. */
-export function nextSpeed(speed, { gas = false, brake = false }, dt, p = KART_PARAMS) {
+/** Pedals and drag -> new speed. Off the road, grass drags you down to a crawl. */
+export function nextSpeed(speed, { gas = false, brake = false }, dt, p = KART_PARAMS, offRoad = false) {
   let v = speed;
   if (brake) {
     // Brake while rolling forward; once stopped, holding brake backs up.
@@ -56,7 +58,11 @@ export function nextSpeed(speed, { gas = false, brake = false }, dt, p = KART_PA
     v = Math.abs(v) <= slow ? 0 : v - Math.sign(v) * slow;
   }
   v -= Math.sign(v) * p.airDrag * v * v * dt;
-  return clamp(v, -p.maxReverse, p.maxSpeed);
+  v = clamp(v, -p.maxReverse, p.maxSpeed);
+  if (offRoad && Math.abs(v) > p.offRoadMaxSpeed) {
+    v = Math.sign(v) * Math.max(p.offRoadMaxSpeed, Math.abs(v) - p.offRoadDrag * dt);
+  }
+  return v;
 }
 
 /**
@@ -64,12 +70,12 @@ export function nextSpeed(speed, { gas = false, brake = false }, dt, p = KART_PA
  * Steering right (positive) turns clockwise seen from above, so heading goes down.
  * In reverse the turn flips, like a real car backing up.
  */
-export function stepKart(kart, input, dt, p = KART_PARAMS) {
+export function stepKart(kart, input, dt, p = KART_PARAMS, { offRoad = false } = {}) {
   kart.prev.x = kart.x;
   kart.prev.z = kart.z;
   kart.prev.heading = kart.heading;
 
-  kart.speed = nextSpeed(kart.speed, input, dt, p);
+  kart.speed = nextSpeed(kart.speed, input, dt, p, offRoad);
   const steer = clamp(input.steer ?? 0, -1, 1);
   kart.heading -= steer * p.maxTurnRate * turnGrip(kart.speed, p) * Math.sign(kart.speed) * dt;
 
@@ -94,30 +100,29 @@ export function bounceOff(kart, nx, nz, bounce) {
   kart.speed = vx * f.x + vz * f.z;
 }
 
-/** Keep the kart inside a rectangular arena centred on the origin. */
-export function collideWithArena(kart, arena, p = KART_PARAMS) {
-  const xMax = arena.halfWidth - p.radius;
-  const zMax = arena.halfDepth - p.radius;
-  let hit = false;
-  if (kart.x > xMax) {
-    kart.x = xMax;
-    bounceOff(kart, -1, 0, p.wallBounce);
-    hit = true;
-  } else if (kart.x < -xMax) {
-    kart.x = -xMax;
-    bounceOff(kart, 1, 0, p.wallBounce);
-    hit = true;
+/**
+ * Keep the kart between the tyre walls on either side of the track.
+ * `where` is track.locate() for the kart's position: how far it is from the
+ * centre line (`lateral`, + = right) and how far out each wall is there.
+ */
+export function collideWithBarriers(kart, where, p = KART_PARAMS) {
+  const maxRight = where.barrierRight - p.radius;
+  const maxLeft = where.barrierLeft - p.radius;
+  if (where.lateral > maxRight) {
+    const push = where.lateral - maxRight;
+    kart.x -= where.rx * push;
+    kart.z -= where.rz * push;
+    bounceOff(kart, -where.rx, -where.rz, p.wallBounce); // the wall faces back towards the road
+    return true;
   }
-  if (kart.z > zMax) {
-    kart.z = zMax;
-    bounceOff(kart, 0, -1, p.wallBounce);
-    hit = true;
-  } else if (kart.z < -zMax) {
-    kart.z = -zMax;
-    bounceOff(kart, 0, 1, p.wallBounce);
-    hit = true;
+  if (where.lateral < -maxLeft) {
+    const push = -maxLeft - where.lateral;
+    kart.x += where.rx * push;
+    kart.z += where.rz * push;
+    bounceOff(kart, where.rx, where.rz, p.wallBounce);
+    return true;
   }
-  return hit;
+  return false;
 }
 
 /** Round obstacles (cones, crates, trees): { x, z, radius }. */
@@ -175,15 +180,26 @@ export function collideKarts(a, b, p = KART_PARAMS) {
 
 /**
  * Advance the whole world by one fixed step.
- * `world` = { karts: Map<slot, kart>, arena, obstacles }, `inputFor(slot)` -> input.
- * Returns the slots that hit something this step (for effects later).
+ * `world` = { karts: Map<slot, kart>, track, obstacles }, `inputFor(slot)` -> input.
+ * Each kart remembers where it is on the track (`kart.where`), which the race
+ * rules read too. Returns the slots that hit something this step.
  */
 export function stepWorld(world, inputFor, dt, p = KART_PARAMS) {
   const hits = new Set();
+  const { track } = world;
   for (const [slot, kart] of world.karts) {
-    stepKart(kart, inputFor(slot), dt, p);
-    if (collideWithArena(kart, world.arena, p)) hits.add(slot);
-    for (const obstacle of world.obstacles) {
+    const before = track.locate(kart.x, kart.z, kart.where?.index ?? null);
+    stepKart(kart, inputFor(slot), dt, p, { offRoad: track.isOffRoad(before.lateral) });
+
+    let where = track.locate(kart.x, kart.z, before.index);
+    if (collideWithBarriers(kart, where, p)) {
+      hits.add(slot);
+      where = track.locate(kart.x, kart.z, where.index);
+    }
+    kart.where = where;
+    kart.offRoad = track.isOffRoad(where.lateral);
+
+    for (const obstacle of world.obstacles ?? []) {
       if (collideWithObstacle(kart, obstacle, p)) hits.add(slot);
     }
   }

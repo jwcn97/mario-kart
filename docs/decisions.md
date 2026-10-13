@@ -92,3 +92,26 @@ A short log of design choices. Newest at the bottom. Each entry: what we chose, 
 **Chose:** auto camera: chase cam for one kart, a "group" camera over the middle of the pack for several.
 **Instead of:** split screen right away.
 **Why:** the plan saves split screen for Phase 7. A group camera is enough to see everyone while the driving itself gets built.
+
+## 17. A track is a list of points; everything else is computed (Phase 4)
+
+**Chose:** 20 control points → our own centripetal Catmull-Rom spline → samples every 1 m, each with distance along the lap, direction, "right" and wall distances. Physics, race rules, the 3D track and the minimap all use the same samples.
+**Instead of:** modelling the track in a 3D tool, or Three.js's `CatmullRomCurve3`.
+**Why:** new tracks are a list of numbers; one source of truth means the road you see is exactly the road the physics and lap counting use; no Three.js in the logic, so it's all unit-tested.
+
+## 18. Laps from continuous progress, checked by gates (Phase 4)
+
+**Chose:** each racer accumulates "distance driven along the track" every step (the short way round the loop), with nearest-point search limited to ±12 m of last step's position, and jumps over 5 m ignored. Laps need every checkpoint in order.
+**Instead of:** trigger boxes at checkpoints only.
+**Why:** progress gives positions and wrong-way detection for free, can't be fooled by reversing over the line, and the local search can't jump across the infield. Trigger boxes alone can be skipped or double-counted.
+
+## 19. Grass slows, walls stop (Phase 4)
+
+**Chose:** off-road speed cap (11 m/s) plus tyre walls 16 m out, pulled in on the inside of tight corners so they never fold.
+**Instead of:** walls right at the road edge.
+**Why:** running wide should cost time, not stop you dead, which feels fair with tilt steering. Walls still keep everyone near the track and make shortcuts impossible.
+
+## 20. Race time is physics time (Phase 4)
+
+**Chose:** the race clock is the sum of fixed physics steps.
+**Why:** lap times are exact and the same on every computer, even when frames stutter, and the rules can be tested by stepping time instead of waiting for it.

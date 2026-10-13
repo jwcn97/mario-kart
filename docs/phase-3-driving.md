@@ -2,7 +2,7 @@
 
 **Goal:** every player in the room gets a kart in a 3D arena on the shared screen and drives it from their phone (tilt to steer, thumbs on gas and brake). Keyboards work too, so two people can test at one laptop.
 
-Code: [`game/physics.js`](../game/physics.js) (arcade kart model), [`game/loop.js`](../game/loop.js) (fixed timestep), [`game/input.js`](../game/input.js) (phones + keyboard), [`game/world.js`](../game/world.js) (Three.js scene and cameras), [`game/course.js`](../game/course.js) (arena layout), [`game/main.js`](../game/main.js) (wires it together).
+Code: [`game/physics.js`](../game/physics.js) (arcade kart model), [`game/loop.js`](../game/loop.js) (fixed timestep), [`game/input.js`](../game/input.js) (phones + keyboard), [`game/world.js`](../game/world.js) (Three.js scene and cameras), `game/course.js` (arena layout; removed in Phase 4), [`game/main.js`](../game/main.js) (wires it together).
 
 ## Try it
 
@@ -117,4 +117,4 @@ Every kart number is in `KART_PARAMS` at the top of `game/physics.js`. Change on
 
 ## Next: Phase 4
 
-Replace the open arena with a real track: a closed loop built from a spline, laps, checkpoints, a lap timer and a wrong-way warning.
+Replace the open arena with a real track: a closed loop built from a spline, laps, checkpoints, a lap timer and a wrong-way warning: [phase-4-track.md](phase-4-track.md). (The arena, `course.js` and the arena wall code were removed in Phase 4.)

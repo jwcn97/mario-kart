@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/shared/theme.css" />
     <link rel="stylesheet" href="./style.css" />
   </head>
-  <body>
+  <body class="practice">
     <!-- The 3D world fills the screen; everything else floats on top. -->
     <canvas id="scene"></canvas>
 
@@ -24,15 +24,41 @@
       </div>
     </section>
 
+    <!-- Race status, top centre -->
+    <section id="race-panel" class="panel race-panel" aria-live="polite">
+      <div id="race-title" class="race-title">Practice</div>
+      <div id="race-sub" class="race-sub"></div>
+      <button id="start-race" class="btn small" type="button">Start race</button>
+    </section>
+
     <div class="top-right">
       <span id="camera-chip" class="chip">auto camera</span>
       <span id="server-chip" class="chip">connecting…</span>
     </div>
 
-    <!-- One chip per kart: colour, speed, input source -->
+    <!-- Countdown, "FINAL LAP", "WRONG WAY": big centred messages -->
+    <div id="countdown" class="countdown" hidden></div>
+    <div id="alerts" class="alerts" aria-live="assertive"></div>
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+
+    <!-- Results after a race -->
+    <section id="results" class="panel results" hidden>
+      <h2 id="results-title">Results</h2>
+      <table>
+        <thead>
+          <tr><th></th><th>Driver</th><th>Time</th><th>Best lap</th></tr>
+        </thead>
+        <tbody id="results-rows"></tbody>
+      </table>
+      <p class="results-hint"><kbd>Space</kbd> race again · <kbd>R</kbd> back to practice</p>
+    </section>
+
+    <canvas id="minimap" class="panel minimap" aria-label="Track map"></canvas>
+
+    <!-- One chip per kart: place, laps, speed, input -->
     <section id="hud" class="hud" aria-label="Players"></section>
 
-    <!-- Phase 2 connection stats (D toggles) -->
+    <!-- Phase 2 connection stats (I toggles) -->
     <section id="debug" class="panel debug" hidden>
       <table>
         <thead>
@@ -44,8 +70,8 @@
     </section>
 
     <p class="keys">
-      <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> P1 · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> P2 ·
-      <kbd>C</kbd> camera · <kbd>R</kbd> reset · <kbd>Q</kbd> join panel · <kbd>I</kbd> stats
+      <kbd>Space</kbd> start race · <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> P1 · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> P2 ·
+      <kbd>C</kbd> camera · <kbd>R</kbd> reset · <kbd>Q</kbd> join panel · <kbd>G</kbd> checkpoints · <kbd>I</kbd> stats
     </p>
 
     <div id="banner" class="banner" role="alert" hidden></div>
@@ -53,11 +79,17 @@
     <template id="hud-chip">
       <article class="player">
         <span class="badge"></span>
+        <span class="place"></span>
         <div class="speed"><span class="kmh">0</span><small>km/h</small></div>
         <div class="meta">
           <span class="source"></span>
           <div class="steer"><div class="steer-centre"></div><div class="steer-fill"></div></div>
           <div class="pedals"><span class="gas">GAS</span><span class="brake">BRAKE</span></div>
+        </div>
+        <div class="laps">
+          <span class="lap"></span>
+          <span class="laptime"></span>
+          <span class="best"></span>
         </div>
       </article>
     </template>
