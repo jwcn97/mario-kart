@@ -11,6 +11,7 @@
   <body class="practice">
     <!-- The 3D world fills the screen; everything else floats on top. -->
     <canvas id="scene"></canvas>
+    <div id="speedlines" class="speedlines" aria-hidden="true"></div>
 
     <!-- Join panel: QR code + room code (Q hides it) -->
     <section id="join" class="panel join" aria-label="Join this game">
@@ -70,8 +71,9 @@
     </section>
 
     <p class="keys">
-      <kbd>Space</kbd> start race · <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> P1 · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> P2 ·
-      <kbd>C</kbd> camera · <kbd>R</kbd> reset · <kbd>Q</kbd> join panel · <kbd>G</kbd> checkpoints · <kbd>I</kbd> stats
+      <kbd>Space</kbd> start race · <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> + <kbd>Right ⇧</kbd> P1 ·
+      <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> + <kbd>Left ⇧</kbd> P2 · <kbd>C</kbd> camera · <kbd>R</kbd> reset ·
+      <kbd>Q</kbd> join · <kbd>G</kbd> gates · <kbd>T</kbd> tuning · <kbd>I</kbd> stats
     </p>
 
     <div id="banner" class="banner" role="alert" hidden></div>
@@ -84,7 +86,7 @@
         <div class="meta">
           <span class="source"></span>
           <div class="steer"><div class="steer-centre"></div><div class="steer-fill"></div></div>
-          <div class="pedals"><span class="gas">GAS</span><span class="brake">BRAKE</span></div>
+          <div class="pedals"><span class="gas">GAS</span><span class="brake">BRAKE</span><span class="charge"></span></div>
         </div>
         <div class="laps">
           <span class="lap"></span>

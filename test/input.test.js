@@ -10,7 +10,7 @@ const tickFor = (hub, seconds) => {
 test('phone input is used while fresh', () => {
   const hub = new InputHub();
   hub.phoneInput(1, { steer: 0.4, gas: true }, 1000);
-  assert.deepEqual(hub.get(1, 1100), { steer: 0.4, gas: true, brake: false, source: 'phone' });
+  assert.deepEqual(hub.get(1, 1100), { steer: 0.4, gas: true, brake: false, drift: false, source: 'phone' });
 });
 
 test('a phone that goes quiet counts as hands off after 500 ms', () => {
@@ -69,4 +69,18 @@ test('releaseAllKeys drops stuck keys', () => {
   hub.keyDown('ArrowUp');
   hub.releaseAllKeys();
   assert.equal(hub.get(1, 0).gas, false);
+});
+
+test('Right Shift drifts for P1 while driving with the arrows; Shift alone does not take over a phone', () => {
+  const hub = new InputHub();
+  hub.phoneInput(1, { steer: 0.5, gas: true, drift: true }, 0);
+  hub.keyDown('ShiftRight');
+  assert.equal(hub.get(1, 10).source, 'phone', 'Shift alone leaves the phone in charge');
+  assert.equal(hub.get(1, 10).drift, true, 'the phone is drifting');
+  assert.equal(hub.keyboardUsed.has(1), false);
+
+  hub.keyDown('ArrowUp');
+  const kb = hub.get(1, 10);
+  assert.equal(kb.source, 'keyboard');
+  assert.equal(kb.drift, true);
 });

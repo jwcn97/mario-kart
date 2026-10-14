@@ -133,4 +133,4 @@ The ~150 trees use **instancing**: one `InstancedMesh` per tree part holds every
 
 ## Next: Phase 5
 
-Make driving fun on its own: drifting with a mini-turbo, boost pads, a ramp, and "juice" (speed lines, camera kick, sparks, phone vibration).
+Make driving fun on its own: drifting with a mini-turbo, boost pads, a ramp, and "juice" (speed lines, camera kick, sparks, phone vibration): [phase-5-feel.md](phase-5-feel.md).

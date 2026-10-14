@@ -14,7 +14,7 @@ flowchart LR
 
 | Part | Runs on | Job | Arrives in |
 | --- | --- | --- | --- |
-| Controller page | Each player's phone browser | Read the gyro and buttons, send input, show a mini HUD | Phase 1 (steering), Phase 2 (joins a room, streams input) |
+| Controller page | Each player's phone browser | Read the gyro and buttons, send input; vibrate and show drift charge when the game says | Phase 1 (steering), Phase 2 (joins a room, streams input), Phase 5 (feedback) |
 | Relay server | Inside the dev server during development; a small host when shipped | Pair phones with a game by room code, forward messages | Phase 2 |
 | Game screen | Any big-screen browser | 3D world, kart physics, race rules, cameras, HUD | Phase 2 (room + QR), Phase 3 (driving), Phase 4 (racing) |
 
@@ -33,13 +33,15 @@ mario-kart/
 ├── game/                 Shared game screen
 │   ├── index.html
 │   ├── main.js           Wires it together: room + QR, karts, loop, race screens, HUD
-│   ├── physics.js        Arcade kart model, grass, barriers, collisions (no Three.js), unit-tested
+│   ├── physics.js        Arcade kart model, drift, boost, jumps, grass, barriers, collisions (no Three.js), unit-tested
 │   ├── loop.js           Fixed 120 Hz timestep with interpolation, unit-tested
 │   ├── input.js          Phone + keyboard input, whichever is active, unit-tested
-│   ├── track.js          Track layout, spline, locating karts, start grid (no Three.js), unit-tested
+│   ├── track.js          Track layout, spline, locating karts, start grid, pads and ramp (no Three.js), unit-tested
 │   ├── race.js           Countdown, checkpoints, laps, timing, standings (no browser), unit-tested
-│   ├── world.js          Three.js scene: track ribbons, gantry, trees, kart models, cameras
+│   ├── world.js          Three.js scene: track, pads, ramp, trees, karts, sparks, flames, cameras
 │   ├── minimap.js        Top-down 2D map with a dot per kart
+│   ├── feedback.js       Physics events -> camera shake and phone vibration, unit-tested
+│   ├── tuning.js         Live tuning panel (T) for every kart number
 │   └── style.css
 ├── server/
 │   ├── relay.js          Room and player rules (no networking), unit-tested
@@ -62,5 +64,6 @@ mario-kart/
 - **@vitejs/plugin-basic-ssl** gives the dev server a self-signed HTTPS certificate, which phones require before they'll share motion sensors.
 - **ws** is the WebSocket server library for Node. Browsers have WebSockets built in.
 - **qrcode** draws the join QR code on the game screen.
-- **three** (Three.js) draws the 3D world with WebGL. No physics engine: kart physics is our own ~200 lines.
+- **three** (Three.js) draws the 3D world with WebGL. No physics engine: kart physics is our own few hundred lines.
+- **lil-gui** draws the tuning panel's sliders.
 - **Node's built-in test runner** (`node --test`) runs the tests; no extra test library.

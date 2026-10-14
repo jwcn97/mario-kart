@@ -597,3 +597,47 @@ kbd {
     height: 138px;
   }
 }
+
+/* ---------- Feel (Phase 5) ---------- */
+
+.pedals .charge {
+  background: none;
+  padding-inline: 2px;
+}
+
+.pedals .charge[data-state^='drift'] {
+  color: #e8e2c8;
+}
+
+.pedals .charge[data-state='drift-1'] {
+  color: #6aa8ff;
+}
+
+.pedals .charge[data-state='drift-2'] {
+  color: #ff9a3d;
+}
+
+.pedals .charge[data-state='boost'] {
+  background: #ff8a1f;
+  color: #2a1300;
+  padding-inline: 5px;
+}
+
+/* Streaks from the edges while boosting: a repeating cone of thin lines, with a clear middle. */
+.speedlines {
+  position: fixed;
+  inset: -20%;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  background: repeating-conic-gradient(from 0deg at 50% 50%, rgb(255 255 255 / 0.55) 0deg 0.6deg, transparent 0.6deg 7deg);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 32%, black 70%);
+  mask-image: radial-gradient(circle at 50% 50%, transparent 32%, black 70%);
+  animation: speedlines 0.25s steps(3) infinite;
+}
+
+@keyframes speedlines {
+  to {
+    transform: rotate(4deg);
+  }
+}

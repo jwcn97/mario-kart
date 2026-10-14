@@ -12,6 +12,11 @@
  * The track (Phase 4) is built from the same samples the physics uses: the road,
  * kerbs and tyre walls are "ribbons", strips of triangles following the centre
  * line at fixed distances to the left and right.
+ *
+ * "Juice" (Phase 5): effects that make speed and drifting feel good without
+ * changing the physics: the kart swings sideways in a drift, sparks fly in the
+ * drift's charge colour, boosts get a flame and a wider field of view, landings
+ * squash the kart, and hits shake the camera.
  */
 import * as THREE from 'three';
 import { forwardOf } from './physics.js';
@@ -20,6 +25,8 @@ const SKY = 0x8fd0f5;
 const WALL_HEIGHT = 1.0;
 const WHEEL_RADIUS = 0.34;
 const SHADOW_REACH = 70; // m around the camera's focus that get sharp shadows
+const BASE_FOV = 60;
+const SPARK_COLOURS = [new THREE.Color('#ffe9a8'), new THREE.Color('#3d8bff'), new THREE.Color('#ff8a1f')];
 
 /** 1 - e^(-rate·dt): frame-rate independent smoothing for lerp. */
 const smooth = (rate, dt) => 1 - Math.exp(-rate * dt);
@@ -40,9 +47,13 @@ export class World {
     this.centre = new THREE.Vector3((minX + maxX) / 2, 0, (minZ + maxZ) / 2);
     this.extent = Math.max(maxX - minX, maxZ - minZ) / 2;
 
-    this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 800);
+    this.camera = new THREE.PerspectiveCamera(BASE_FOV, 1, 0.1, 800);
     this.camera.position.set(this.centre.x, 140, this.centre.z + 220);
+    this.cameraBase = this.camera.position.clone(); // where the camera is before shake
     this.lookAt = this.centre.clone();
+    this.trauma = 0; // camera shake, 0..1, decays over time
+    this.speedLines = 0; // 0..1, how strongly to show the boost speed lines
+    this.juice = 1; // multiplier for shake and FOV kick (tuning panel)
 
     this.karts = new Map(); // slot -> { group, wheels, frontPivots, tag }
     this.cameraMode = 'auto'; // 'auto' | 'group' | slot number (chase that kart)
@@ -53,6 +64,8 @@ export class World {
     this.#addStartLine();
     this.#addCheckpointGates();
     this.#addTrees();
+    this.#addFeatures();
+    this.sparks = new Sparks(this.scene);
     this.resize();
     window.addEventListener('resize', () => this.resize());
   }
@@ -240,6 +253,34 @@ export class World {
     }
   }
 
+  /** Boost pads (scrolling chevrons) and the ramp, built along the track like the road. */
+  #addFeatures() {
+    this.padTextures = [];
+    for (const f of this.track.features) {
+      if (f.type === 'boost') {
+        const map = chevronTexture();
+        map.wrapT = THREE.RepeatWrapping;
+        map.repeat.set(1, 2);
+        this.padTextures.push(map);
+        const strip = featureStrip(this.track, f, { y: 0.045, steps: 12 });
+        const mesh = new THREE.Mesh(strip, new THREE.MeshBasicMaterial({ map, transparent: true }));
+        this.scene.add(mesh);
+      } else if (f.type === 'ramp') {
+        const { top, sides } = rampGeometry(this.track, f);
+        const stripes = stripeTexture('#ffc400', '#23262d');
+        stripes.wrapT = THREE.RepeatWrapping;
+        stripes.repeat.set(1, 4);
+        const topMesh = new THREE.Mesh(top, new THREE.MeshStandardMaterial({ map: stripes, roughness: 0.7 }));
+        const sideMesh = new THREE.Mesh(sides, standard(0x3a3e47, { side: THREE.DoubleSide }));
+        for (const m of [topMesh, sideMesh]) {
+          m.castShadow = true;
+          m.receiveShadow = true;
+          this.scene.add(m);
+        }
+      }
+    }
+  }
+
   // ---------- Karts ----------
 
   addKart(slot, { color, name }) {
@@ -252,6 +293,17 @@ export class World {
     this.karts.set(slot, kart);
   }
 
+  /** A short squash when a kart lands from a jump. */
+  squash(slot, amount = 1) {
+    const kart = this.karts.get(slot);
+    if (kart) kart.squash = Math.max(kart.squash, amount);
+  }
+
+  /** Shake the camera. `amount` 0..1 adds up and fades out. */
+  shake(amount) {
+    this.trauma = Math.min(1, this.trauma + amount * this.juice);
+  }
+
   removeKart(slot) {
     const kart = this.karts.get(slot);
     if (!kart) return;
@@ -259,19 +311,60 @@ export class World {
     this.karts.delete(slot);
   }
 
-  /** Move a kart's model to the pose physics computed. */
-  updateKart(slot, { x, z, heading }, speed, steer, dt) {
+  /**
+   * Move a kart's model to the pose physics computed, and play its effects.
+   * `state` is the physics kart (speed, drift, boost, airborne).
+   */
+  updateKart(slot, { x, y, z, heading }, state, steer, dt) {
     const kart = this.karts.get(slot);
     if (!kart) return;
-    kart.group.position.set(x, 0, z);
+    const { speed, drift, boost, airborne } = state;
+    kart.group.position.set(x, y ?? 0, z);
     kart.group.rotation.y = heading;
     kart.speed = speed;
     kart.heading = heading;
+    kart.boost = boost;
+
     // Wheels roll with speed; front wheels turn with steering (right = negative yaw).
     for (const wheel of kart.wheels) wheel.rotation.x += (speed * dt) / WHEEL_RADIUS;
     for (const pivot of kart.frontPivots) pivot.rotation.y = -steer * 0.45;
+
+    // Drift: the whole kart swings its nose into the turn while it travels along
+    // the physics heading. That sideways angle is what reads as "sliding".
+    const driftYaw = -drift.dir * 0.4;
+    kart.drifter.rotation.y = THREE.MathUtils.lerp(kart.drifter.rotation.y, driftYaw, smooth(8, dt));
+
     // Lean the body a little into turns at speed: cheap, but it sells the motion.
-    kart.body.rotation.z = THREE.MathUtils.lerp(kart.body.rotation.z, steer * Math.min(Math.abs(speed) / 24, 1) * 0.08, smooth(10, dt));
+    const lean = (drift.dir || steer) * Math.min(Math.abs(speed) / 24, 1) * (drift.dir ? 0.12 : 0.08);
+    kart.body.rotation.z = THREE.MathUtils.lerp(kart.body.rotation.z, lean, smooth(10, dt));
+
+    // Landing squash, springing back.
+    kart.squash = Math.max(0, kart.squash - dt * 4);
+    const sq = Math.sin(kart.squash * Math.PI) * 0.22 * this.juice;
+    kart.drifter.scale.set(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5);
+
+    // Boost flame, flickering.
+    kart.flame.visible = boost > 0;
+    if (boost > 0) kart.flame.scale.set(1, 1, 0.7 + Math.random() * 0.6 + Math.min(boost, 1) * 0.5);
+
+    // Sparks from the rear wheels while drifting, in the charge colour.
+    if (drift.dir !== 0 && !airborne) {
+      kart.sparkDebt += dt * (drift.level === 0 ? 30 : 90);
+      kart.group.updateMatrixWorld();
+      const back = new THREE.Vector3(-Math.sin(heading), 0, -Math.cos(heading));
+      while (kart.sparkDebt >= 1) {
+        kart.sparkDebt -= 1;
+        const side = Math.random() < 0.5 ? -0.85 : 0.85;
+        const at = kart.drifter.localToWorld(new THREE.Vector3(side, 0.15, -0.85));
+        const v = back.clone().multiplyScalar(2 + Math.random() * 3);
+        v.x += (Math.random() - 0.5) * 3;
+        v.z += (Math.random() - 0.5) * 3;
+        v.y = 1.5 + Math.random() * 2.5;
+        this.sparks.emit(at, v, SPARK_COLOURS[drift.level]);
+      }
+    } else {
+      kart.sparkDebt = 0;
+    }
   }
 
   // ---------- Cameras ----------
@@ -320,14 +413,38 @@ export class World {
       const kart = mode === 'chase-only' ? karts[0] : this.karts.get(mode);
       const f = forwardOf(kart.heading);
       const p = kart.group.position;
-      desired.set(p.x - f.x * 8.5, 4.2, p.z - f.z * 8.5);
-      target.set(p.x + f.x * 5, 1, p.z + f.z * 5);
+      desired.set(p.x - f.x * 8.5, p.y + 4.2, p.z - f.z * 8.5); // rises with the kart over jumps
+      target.set(p.x + f.x * 5, p.y + 1, p.z + f.z * 5);
     }
 
     // Glide towards the goal instead of snapping: smoother, and hides physics jitter.
-    this.camera.position.lerp(desired, smooth(mode === 'overview' ? 1 : 4, dt));
+    this.cameraBase.lerp(desired, smooth(mode === 'overview' ? 1 : 4, dt));
     this.lookAt.lerp(target, smooth(6, dt));
+
+    // Shake: a random nudge that grows with trauma², so small hits barely show.
+    this.trauma = Math.max(0, this.trauma - dt * 1.8);
+    const shake = this.trauma * this.trauma * 0.8;
+    this.camera.position.set(
+      this.cameraBase.x + (Math.random() - 0.5) * shake,
+      this.cameraBase.y + (Math.random() - 0.5) * shake,
+      this.cameraBase.z + (Math.random() - 0.5) * shake,
+    );
     this.camera.lookAt(this.lookAt);
+
+    // Field of view widens with speed, and more while boosting: speed you can feel.
+    const focus = mode === 'chase-only' ? karts[0] : typeof mode === 'number' ? this.karts.get(mode) : null;
+    const speed = focus ? Math.abs(focus.speed) : 0;
+    const boosting = focus ? focus.boost > 0 : karts.some((k) => k.boost > 0);
+    const fov = BASE_FOV + (Math.min(speed / 24, 1.3) * 5 + (boosting ? 9 : 0)) * this.juice;
+    this.speedLines = THREE.MathUtils.lerp(this.speedLines, boosting ? Math.min(1, this.juice) : 0, smooth(6, dt));
+    if (Math.abs(this.camera.fov - fov) > 0.01) {
+      this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, fov, smooth(5, dt));
+      this.camera.updateProjectionMatrix();
+    }
+
+    // Moving parts of the scenery.
+    this.sparks.update(dt);
+    for (const map of this.padTextures) map.offset.y = (map.offset.y - dt * 1.5) % 1;
 
     // Keep the sun's shadow box centred on what we're looking at.
     this.sun.target.position.copy(this.lookAt);
@@ -414,6 +531,134 @@ function wallMesh(track, offsetAt, map) {
   return mesh;
 }
 
+/** A flat strip on the road for a feature (boost pad), following the track's curve. */
+function featureStrip(track, f, { y, steps }) {
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const p = track.pointAt(f.s + f.length * t);
+    for (const [side, u] of [
+      [-1, 0],
+      [1, 1],
+    ]) {
+      const off = f.lateral + side * f.halfWidth;
+      positions.push(p.x + p.rx * off, y, p.z + p.rz * off);
+      uvs.push(u, t);
+    }
+    if (i < steps) {
+      const a = i * 2;
+      indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/** The ramp: a sloped top following the track, plus side and end walls. */
+function rampGeometry(track, f) {
+  const steps = 16;
+  const top = [];
+  const uvs = [];
+  const topIndex = [];
+  const side = [];
+  const sideIndex = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const p = track.pointAt(f.s + f.length * t);
+    const h = f.height * t;
+    const left = [p.x - p.rx * f.halfWidth, p.z - p.rz * f.halfWidth];
+    const right = [p.x + p.rx * f.halfWidth, p.z + p.rz * f.halfWidth];
+    top.push(left[0], h, left[1], right[0], h, right[1]);
+    uvs.push(0, t, 1, t);
+    // Side walls: bottom and top of each side.
+    side.push(left[0], 0, left[1], left[0], h, left[1], right[0], 0, right[1], right[0], h, right[1]);
+    if (i < steps) {
+      const a = i * 2;
+      topIndex.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      const b = i * 4;
+      sideIndex.push(b, b + 4, b + 1, b + 1, b + 4, b + 5, b + 2, b + 3, b + 6, b + 3, b + 7, b + 6);
+    }
+  }
+  // End wall at the top of the ramp (the drop you fly off).
+  const e = steps * 4;
+  sideIndex.push(e, e + 2, e + 1, e + 1, e + 2, e + 3);
+
+  const topGeometry = new THREE.BufferGeometry();
+  topGeometry.setAttribute('position', new THREE.Float32BufferAttribute(top, 3));
+  topGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  topGeometry.setIndex(topIndex);
+  topGeometry.computeVertexNormals();
+  const sideGeometry = new THREE.BufferGeometry();
+  sideGeometry.setAttribute('position', new THREE.Float32BufferAttribute(side, 3));
+  sideGeometry.setIndex(sideIndex);
+  sideGeometry.computeVertexNormals();
+  return { top: topGeometry, sides: sideGeometry };
+}
+
+/**
+ * A pool of spark particles drawn as one THREE.Points: cheap enough for hundreds.
+ * Each spark flies, falls and fades out after a third of a second.
+ */
+class Sparks {
+  constructor(scene, count = 400) {
+    this.count = count;
+    this.next = 0;
+    this.positions = new Float32Array(count * 3).fill(-1000);
+    this.colors = new Float32Array(count * 3);
+    this.velocities = new Float32Array(count * 3);
+    this.life = new Float32Array(count);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
+    this.geometry = geometry;
+    this.points = new THREE.Points(
+      geometry,
+      new THREE.PointsMaterial({
+        size: 0.32,
+        map: sparkTexture(), // soft round dot instead of a hard square
+        vertexColors: true,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    );
+    this.points.frustumCulled = false;
+    scene.add(this.points);
+  }
+
+  emit(at, velocity, color) {
+    const i = this.next++ % this.count;
+    this.positions.set([at.x, at.y, at.z], i * 3);
+    this.velocities.set([velocity.x, velocity.y, velocity.z], i * 3);
+    this.colors.set([color.r, color.g, color.b], i * 3);
+    this.life[i] = 0.3 + Math.random() * 0.15;
+  }
+
+  update(dt) {
+    for (let i = 0; i < this.count; i++) {
+      if (this.life[i] <= 0) continue;
+      this.life[i] -= dt;
+      const k = i * 3;
+      if (this.life[i] <= 0) {
+        this.positions[k + 1] = -1000; // hide
+        continue;
+      }
+      this.velocities[k + 1] -= 12 * dt;
+      this.positions[k] += this.velocities[k] * dt;
+      this.positions[k + 1] = Math.max(0.05, this.positions[k + 1] + this.velocities[k + 1] * dt);
+      this.positions[k + 2] += this.velocities[k + 2] * dt;
+    }
+    this.geometry.attributes.position.needsUpdate = true;
+    this.geometry.attributes.color.needsUpdate = true;
+  }
+}
+
 // ---------- Models (built from simple shapes) ----------
 
 function standard(color, extra = {}) {
@@ -427,9 +672,12 @@ function shadowed(mesh) {
 }
 
 function makeKart(color) {
+  // group (position + heading) > drifter (drift swing, squash) > body + wheels
   const group = new THREE.Group();
+  const drifter = new THREE.Group();
   const body = new THREE.Group();
-  group.add(body);
+  group.add(drifter);
+  drifter.add(body);
 
   const paint = standard(color, { roughness: 0.35, metalness: 0.1 });
   const dark = standard(0x23262d, { roughness: 0.8 });
@@ -480,12 +728,24 @@ function makeKart(color) {
     const hub = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.12, 0.12), standard(0xb8bcc4));
     spinner.add(mesh, hub);
     pivot.add(spinner);
-    group.add(pivot);
+    drifter.add(pivot);
     wheels.push(spinner);
     if (front) frontPivots.push(pivot);
   }
 
-  return { group, body, wheels, frontPivots, speed: 0, heading: 0 };
+  // Boost flame out the back: a cone pointing backwards, glowing (additive blending).
+  const flameGeometry = new THREE.ConeGeometry(0.28, 1.3, 12);
+  flameGeometry.rotateX(-Math.PI / 2); // tip towards -z
+  flameGeometry.translate(0, 0, -0.65);
+  const flame = new THREE.Mesh(
+    flameGeometry,
+    new THREE.MeshBasicMaterial({ color: 0xffa31a, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }),
+  );
+  flame.position.set(0, 0.55, -1.3);
+  flame.visible = false;
+  drifter.add(flame);
+
+  return { group, drifter, body, wheels, frontPivots, flame, speed: 0, heading: 0, boost: 0, squash: 0, sparkDebt: 0 };
 }
 
 function makeNameTag(name, color) {
@@ -567,6 +827,36 @@ function stripeTexture(a, b, alongU = false) {
     ctx.fillStyle = b;
     if (alongU) ctx.fillRect(w / 2, 0, w / 2, h);
     else ctx.fillRect(0, h / 2, w, h / 2);
+  });
+}
+
+/** A soft white dot: brightest in the middle, fading to nothing at the edge. */
+function sparkTexture() {
+  return canvasTexture(32, 32, (ctx, w, h) => {
+    const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.4, 'rgba(255,255,255,0.8)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  });
+}
+
+/** Yellow chevrons pointing along the track (v), for boost pads. */
+function chevronTexture() {
+  return canvasTexture(128, 128, (ctx, w, h) => {
+    ctx.fillStyle = 'rgba(255, 90, 20, 0.85)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#ffd400';
+    ctx.lineWidth = 16;
+    ctx.lineJoin = 'miter';
+    for (const y0 of [24, 88]) {
+      ctx.beginPath();
+      ctx.moveTo(16, y0 + 28);
+      ctx.lineTo(w / 2, y0);
+      ctx.lineTo(w - 16, y0 + 28);
+      ctx.stroke();
+    }
   });
 }
 

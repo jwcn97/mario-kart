@@ -12,6 +12,9 @@
  * Every player in the room gets a kart. Arrows drive P1 and W A S D drive P2,
  * so you can test without phones; holding keys overrides that player's phone.
  * Space starts a race.
+ *
+ * Phase 5: physics events (drifts, boosts, jumps, hits) go to feedback.js,
+ * which shakes the camera and buzzes each player's phone. T opens tuning.
  */
 import QRCode from 'qrcode';
 import { ERRORS, PLAYERS, playerInfo } from '../shared/protocol.js';
@@ -24,6 +27,8 @@ import { buildTrack } from './track.js';
 import { Race, formatTime } from './race.js';
 import { World } from './world.js';
 import { Minimap } from './minimap.js';
+import { Feedback } from './feedback.js';
+import { createTuningPanel, loadParams } from './tuning.js';
 
 const ROOM_KEY = 'kart.game.room'; // remembers our room across reloads
 const STALE_INPUT_MS = 500;
@@ -49,6 +54,17 @@ const race = new Race(track, Number.isInteger(lapsParam) && lapsParam >= 1 && la
 const physics = { karts: new Map(), track, obstacles: [] };
 const world = new World($('scene'), track);
 const minimap = new Minimap($('minimap'), track);
+const params = loadParams(); // kart physics numbers; the tuning panel (T) edits these live
+const tuning = createTuningPanel(params, { world, onMessage: (text) => toast(text) });
+
+// Physics events -> camera shake and phone vibration (only to phones that are connected).
+const feedback = new Feedback({
+  send(slot, data) {
+    const p = players.get(slot);
+    if (p?.present && p.connected) conn.send({ type: 'to-player', slot, data });
+  },
+  effects: { shake: (amount) => world.shake(amount), squash: (slot) => world.squash(slot) },
+});
 const RECORD_KEY = `kart.record.${track.name}`;
 let record = loadRecord(); // fastest lap ever on this track, on this screen
 
@@ -149,6 +165,7 @@ function handleMessage(msg) {
       p.present = true;
       p.connected = msg.connected;
       if (!msg.connected) p.inputTimes = [];
+      if (msg.connected) feedback.forget(msg.slot); // (re)joined: resend its drift state
       syncKarts();
       break;
     }
@@ -157,6 +174,7 @@ function handleMessage(msg) {
       const p = players.get(msg.slot);
       if (p) Object.assign(p, { present: false, connected: false, phoneRtt: null, inputTimes: [] });
       input.forgetPhone(msg.slot);
+      feedback.forget(msg.slot);
       syncKarts();
       break;
     }
@@ -242,6 +260,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyC') $('camera-chip').textContent = world.cycleCamera();
   if (e.code === 'KeyR') backToPractice();
   if (e.code === 'KeyG') toast(world.toggleGates() ? 'Showing checkpoint gates' : 'Checkpoint gates hidden');
+  if (e.code === 'KeyT') tuning.toggle();
   if (e.code === 'KeyQ') $('join').hidden = !$('join').hidden;
   if (e.code === 'KeyI') $('debug').hidden = !$('debug').hidden;
 });
@@ -257,12 +276,13 @@ $('start-race').addEventListener('click', (e) => {
 let frameNow = performance.now();
 const lastInput = new Map(); // slot -> input used in the latest step (for the HUD and wheels)
 const raceEvents = []; // filled by physics steps, shown on the next frame
+const physicsEvents = []; // drifts, boosts, jumps, hits: for effects and phone vibration
 
 const loop = createFixedStep({
   stepHz: 120,
   step(dt) {
     input.tick(dt);
-    stepWorld(
+    const events = stepWorld(
       physics,
       (slot) => {
         // During the countdown everyone waits on the line.
@@ -271,7 +291,9 @@ const loop = createFixedStep({
         return i;
       },
       dt,
+      params,
     );
+    physicsEvents.push(...events);
     raceEvents.push(...race.update(dt, physics.karts));
   },
 });
@@ -294,6 +316,7 @@ for (const p of PLAYERS) {
     gas: chip.querySelector('.gas'),
     brake: chip.querySelector('.brake'),
     place: chip.querySelector('.place'),
+    charge: chip.querySelector('.charge'),
     lap: chip.querySelector('.lap'),
     laptime: chip.querySelector('.laptime'),
     best: chip.querySelector('.best'),
@@ -330,6 +353,13 @@ function renderHud() {
     ui.fill.style.width = `${width}%`;
     ui.gas.classList.toggle('on', i.gas);
     ui.brake.classList.toggle('on', i.brake);
+
+    // Drift charge / boost badge.
+    const charge = kart.boost > 0 ? 'boost' : kart.drift.dir !== 0 ? `drift-${kart.drift.level}` : '';
+    if (ui.charge.dataset.state !== charge) {
+      ui.charge.dataset.state = charge;
+      ui.charge.textContent = charge === 'boost' ? 'BOOST' : charge ? 'DRIFT' : '';
+    }
 
     // Race info: place, lap, lap time, best lap. Late joiners sit this race out.
     const racer = race.racers.get(slot);
@@ -546,13 +576,17 @@ function frame(now) {
 
   const dt = Math.min(frameMs, 100) / 1000;
   for (const [slot, kart] of physics.karts) {
-    world.updateKart(slot, interpolate(kart, alpha), kart.speed, lastInput.get(slot)?.steer ?? 0, dt);
+    world.updateKart(slot, interpolate(kart, alpha), kart, lastInput.get(slot)?.steer ?? 0, dt);
   }
   world.updateCamera(dt, now / 1000);
   world.render();
 
   places = new Map(race.standings().map((r) => [r.slot, r.place]));
   handleRaceEvents(now);
+  feedback.handle(physicsEvents.splice(0), now);
+  for (const [slot, kart] of physics.karts) feedback.drift(slot, kart);
+  feedback.flush();
+  $('speedlines').style.opacity = world.speedLines.toFixed(2);
   renderRacePanel();
   renderCountdown(now);
   renderAlerts(now);
@@ -576,4 +610,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Development only: poke at the game from the browser console, e.g. kart.race.standings().
-if (import.meta.env.DEV) window.kart = { race, physics, track, input, world };
+if (import.meta.env.DEV) window.kart = { race, physics, track, input, world, params, feedback };

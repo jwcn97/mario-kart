@@ -186,7 +186,38 @@ body {
   opacity: 0.75;
 }
 
+/* Left thumb: drift takes the top 60%, brake the rest. */
+.pedal.drift {
+  left: max(16px, env(safe-area-inset-left));
+  bottom: calc(max(10px, env(safe-area-inset-bottom)) + 38% + 8px);
+  background: color-mix(in srgb, #7aa7ff 14%, var(--surface));
+  border-color: color-mix(in srgb, #7aa7ff 50%, transparent);
+  color: #9cbcff;
+}
+
+.pedal.drift.down {
+  background: #7aa7ff;
+  color: #0b1530;
+}
+
+/* Mini-turbo charge, sent back by the game screen. */
+.pedal.drift.level-1 {
+  background: #3d8bff;
+  border-color: #b9d4ff;
+  color: #fff;
+  box-shadow: 0 0 24px #3d8bff;
+}
+
+.pedal.drift.level-2 {
+  background: #ff8a1f;
+  border-color: #ffd7a8;
+  color: #2a1300;
+  box-shadow: 0 0 28px #ff8a1f;
+}
+
 .pedal.brake {
+  top: auto;
+  height: 38%;
   left: max(16px, env(safe-area-inset-left));
   background: color-mix(in srgb, var(--danger) 16%, var(--surface));
   border-color: color-mix(in srgb, var(--danger) 55%, transparent);

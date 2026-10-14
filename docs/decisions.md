@@ -115,3 +115,35 @@ A short log of design choices. Newest at the bottom. Each entry: what we chose, 
 
 **Chose:** the race clock is the sum of fixed physics steps.
 **Why:** lap times are exact and the same on every computer, even when frames stutter, and the rules can be tested by stepping time instead of waiting for it.
+
+## 21. Drifting is a locked turn plus a visual slide (Phase 5)
+
+**Chose:** while drifting, the physics kart keeps moving along its heading but turns at a fixed-direction rate (steering only tightens or widens it); the model swings 23° into the turn on its own group.
+**Instead of:** real sideways velocity and tyre slip.
+**Why:** predictable with tilt steering, easy to tune with two numbers, and it's how most kart racers do it. Decision 14 (velocity along the nose) still holds.
+
+## 22. Mini-turbo charge only on the road (Phase 5)
+
+**Chose:** blue at 0.9 s, orange at 2 s of drifting; the timer pauses on grass and in the air, and a wall ends the drift with no boost.
+**Why:** rewards drifting through corners, not spinning in circles on the grass.
+
+## 23. Boost raises the limit; extra speed fades (Phase 5)
+
+**Chose:** a boost is seconds of higher top speed plus extra push, ignoring grass; afterwards extra speed bleeds off at 10 m/s².
+**Instead of:** a speed multiplier, or snapping back to top speed.
+**Why:** the fade makes boosts feel powerful and smooth, and one "seconds left" number is simple to grant from pads, mini-turbos and (Phase 6) items.
+
+## 24. Track features are placed by position and snapped (Phase 5)
+
+**Chose:** pads and ramps listed with a rough `near` point and a lane; the track computes their distance along the lap.
+**Why:** adding or moving one is editing two numbers; no hand-computed distances that break when the track changes.
+
+## 25. One generic game → phone message, batched and rate-limited (Phase 5)
+
+**Chose:** `to-player { slot, data }` relayed as `from-game { data }`; the relay doesn't look inside. `feedback.js` sends at most one message per phone per frame and one buzz per 120 ms.
+**Why:** the relay stays simple and future-proof (Phase 7's phone HUD rides the same message), and wall scrapes, which fire every physics step, don't flood the network or rattle a phone non-stop.
+
+## 26. Tune live, save per browser, copy back to code (Phase 5)
+
+**Chose:** a lil-gui panel over a mutable copy of `KART_PARAMS`, saved in localStorage, with "Copy as code".
+**Why:** game feel is found by driving, not by reasoning. The defaults stay in code (and in tests); experiments stay local until you paste them in.

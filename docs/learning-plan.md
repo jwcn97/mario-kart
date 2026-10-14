@@ -13,7 +13,7 @@ The full plan (what to learn in each phase, with resources) lives in the shared 
 | 2 | Link phones to the game screen (WebSockets, rooms) | 5–7 h | Done | Two phones join by QR; each tilt moves its own dial on the shared screen; reconnects after the phone locks |
 | 3 | 3D world and a kart that drives (Three.js) | 8–12 h | Done | Two players drive their own karts at once; keyboard still works |
 | 4 | A real track with laps | 8–10 h | Built, check on phones | Finish a 3-lap race; corner cutting doesn't count; wrong-way warning |
-| 5 | Kart feel: drift, boost, juice | 8–12 h | Not started | A friend drives 3 laps and asks to go again |
+| 5 | Kart feel: drift, boost, juice | 8–12 h | Built, check on phones | A friend drives 3 laps and asks to go again |
 | 6 | AI opponents and items | 10–14 h | Not started | You win some races and lose others; items cause overtakes |
 | 7 | Party mode: lobby, split screen, 4 players | 8–12 h | Not started | Four phones join in under a minute; one dropping out doesn't break the race |
 | 8 | Polish and ship | 6–10 h | Not started | A stranger opens the link, scans, and plays without help |

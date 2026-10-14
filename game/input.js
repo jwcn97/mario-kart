@@ -6,18 +6,19 @@
  *  - phones: the latest { steer, gas, brake } from the relay, per slot. If a phone
  *    goes quiet for 500 ms (locked, out of range) its input counts as released,
  *    so a kart never drives off on its own.
- *  - keyboard: arrows drive P1, W A S D drive P2. While any of a slot's keys are
- *    held, the keyboard overrides that slot's phone. Let go and the phone is back.
+ *  - keyboard: arrows drive P1, W A S D drive P2, each with a Shift key to
+ *    drift. While any of a slot's keys are held, the keyboard overrides that
+ *    slot's phone. Let go and the phone is back.
  */
 
 export const KEYBOARD_LAYOUTS = Object.freeze({
-  1: { left: ['ArrowLeft'], right: ['ArrowRight'], gas: ['ArrowUp'], brake: ['ArrowDown'] },
-  2: { left: ['KeyA'], right: ['KeyD'], gas: ['KeyW'], brake: ['KeyS'] },
+  1: { left: ['ArrowLeft'], right: ['ArrowRight'], gas: ['ArrowUp'], brake: ['ArrowDown'], drift: ['ShiftRight'] },
+  2: { left: ['KeyA'], right: ['KeyD'], gas: ['KeyW'], brake: ['KeyS'], drift: ['ShiftLeft'] },
 });
 
 const STEER_IN_PER_S = 4; // keyboard steering ramps in over 0.25 s...
 const STEER_OUT_PER_S = 8; // ...and centres twice as fast
-const NONE = Object.freeze({ steer: 0, gas: false, brake: false, source: 'none' });
+const NONE = Object.freeze({ steer: 0, gas: false, brake: false, drift: false, source: 'none' });
 
 export class InputHub {
   constructor({ staleMs = 500, layouts = KEYBOARD_LAYOUTS } = {}) {
@@ -34,8 +35,8 @@ export class InputHub {
     return new Set(Object.values(this.layouts).flatMap((l) => Object.values(l).flat()));
   }
 
-  phoneInput(slot, { steer = 0, gas = false, brake = false }, at) {
-    this.phones.set(slot, { steer, gas: gas === true, brake: brake === true, at });
+  phoneInput(slot, { steer = 0, gas = false, brake = false, drift = false }, at) {
+    this.phones.set(slot, { steer, gas: gas === true, brake: brake === true, drift: drift === true, at });
   }
 
   forgetPhone(slot) {
@@ -45,7 +46,8 @@ export class InputHub {
   keyDown(code) {
     this.pressed.add(code);
     for (const [slot, layout] of Object.entries(this.layouts)) {
-      if (Object.values(layout).flat().includes(code)) this.keyboardUsed.add(Number(slot));
+      const driving = ['left', 'right', 'gas', 'brake'].some((action) => layout[action].includes(code));
+      if (driving) this.keyboardUsed.add(Number(slot));
     }
   }
 
@@ -65,7 +67,8 @@ export class InputHub {
   #keyboardActive(slot) {
     const layout = this.layouts[slot];
     if (!layout) return false;
-    const anyHeld = Object.keys(layout).some((action) => this.#held(slot, action));
+    // Drift alone doesn't take over: holding Shift shouldn't steal a phone's kart.
+    const anyHeld = ['left', 'right', 'gas', 'brake'].some((action) => this.#held(slot, action));
     return anyHeld || (this.keyboardSteer.get(slot) ?? 0) !== 0;
   }
 
@@ -88,12 +91,13 @@ export class InputHub {
         steer: this.keyboardSteer.get(slot) ?? 0,
         gas: this.#held(slot, 'gas'),
         brake: this.#held(slot, 'brake'),
+        drift: this.#held(slot, 'drift'),
         source: 'keyboard',
       };
     }
     const phone = this.phones.get(slot);
     if (phone && now - phone.at <= this.staleMs) {
-      return { steer: phone.steer, gas: phone.gas, brake: phone.brake, source: 'phone' };
+      return { steer: phone.steer, gas: phone.gas, brake: phone.brake, drift: phone.drift, source: 'phone' };
     }
     return NONE;
   }

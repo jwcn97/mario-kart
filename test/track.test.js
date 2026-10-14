@@ -118,3 +118,34 @@ test('wrapDelta takes the short way round the loop', () => {
   assert.equal(wrapDelta(95, 100), -5);
   assert.equal(wrapDelta(-95, 100), 5);
 });
+
+test('features sit on the road where the layout says', () => {
+  assert.equal(track.features.length, TRACK_LAYOUT.features.length);
+  for (const f of track.features) {
+    assert.ok(!track.isOffRoad(f.lateral), `${f.type} at s=${f.s}`);
+  }
+});
+
+test('ramp: the ground rises along it, and is flat beside and after it', () => {
+  const ramp = track.features.find((f) => f.type === 'ramp');
+  const at = (along, lateral = 0) => {
+    const p = track.pointAt(ramp.s + along);
+    return track.groundHeight(track.locate(p.x + p.rx * lateral, p.z + p.rz * lateral));
+  };
+  close(at(0.01), 0, 0.01);
+  close(at(ramp.length / 2), ramp.height / 2, 0.05);
+  close(at(ramp.length - 0.01), ramp.height, 0.05);
+  assert.equal(at(ramp.length + 1), 0);
+  assert.equal(at(ramp.length / 2, 12), 0, 'on the grass beside it');
+});
+
+test('boost pads are found only on their patch', () => {
+  const pad = track.features.find((f) => f.type === 'boost');
+  const at = (along, lateral) => {
+    const p = track.pointAt(pad.s + along);
+    return track.boostPadAt(track.locate(p.x + p.rx * lateral, p.z + p.rz * lateral));
+  };
+  assert.equal(at(pad.length / 2, pad.lateral), pad);
+  assert.equal(at(pad.length / 2, pad.lateral + 3), null);
+  assert.equal(at(pad.length + 2, pad.lateral), null);
+});

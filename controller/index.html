@@ -72,7 +72,11 @@
       <p id="notice" class="notice" role="status" hidden></p>
       <pre id="debug" class="debug"></pre>
 
-      <!-- Pedals under each thumb while holding the phone like a wheel (Phase 3) -->
+      <!-- Pedals under each thumb while holding the phone like a wheel (Phase 3).
+           Left thumb: drift on top, brake below (Phase 5). Right thumb: gas. -->
+      <button id="drift-pad" class="pedal drift" type="button" aria-label="Drift (hold while steering)">
+        <span>Drift</span><small id="drift-hint">hold while turning</small>
+      </button>
       <button id="brake-pad" class="pedal brake" type="button" aria-label="Brake (hold)">
         <span>Brake</span><small>hold to reverse</small>
       </button>

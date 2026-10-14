@@ -94,8 +94,8 @@ test('input is forwarded to the host, tagged with the slot and clamped', () => {
   const { relay, host, phone } = setup();
   const h = host();
   const p = phone(h.last('room').code, ID(1));
-  relay.receive(p, { type: 'input', steer: 3, seq: 7, rtt: 21.6, gas: true, brake: 'yes' });
-  assert.deepEqual(h.last('input'), { type: 'input', slot: 1, steer: 1, seq: 7, gas: true, brake: false, rtt: 22 });
+  relay.receive(p, { type: 'input', steer: 3, seq: 7, rtt: 21.6, gas: true, brake: 'yes', drift: true });
+  assert.deepEqual(h.last('input'), { type: 'input', slot: 1, steer: 1, seq: 7, gas: true, brake: false, drift: true, rtt: 22 });
 });
 
 test('bad messages are ignored', () => {
@@ -231,4 +231,21 @@ test('the room closes if the game screen stays away past its grace period', () =
   assert.equal(p.last('error').reason, ERRORS.ROOM_CLOSED);
   assert.ok(p.closed);
   assert.equal(phone(code, ID(2)).last('error').reason, ERRORS.NO_ROOM);
+});
+
+test('the game screen can message one phone; phones cannot message each other', () => {
+  const { relay, host, phone } = setup();
+  const h = host();
+  const { code } = h.last('room');
+  const p1 = phone(code, ID(1));
+  const p2 = phone(code, ID(2));
+
+  relay.receive(h, { type: 'to-player', slot: 2, data: { buzz: [40] } });
+  assert.deepEqual(p2.last('from-game'), { type: 'from-game', data: { buzz: [40] } });
+  assert.equal(p1.all('from-game').length, 0);
+
+  relay.receive(p1, { type: 'to-player', slot: 2, data: { buzz: [999] } }); // not allowed
+  relay.receive(h, { type: 'to-player', slot: 2, data: 'nope' }); // not an object
+  relay.receive(h, { type: 'to-player', slot: 3, data: { buzz: [1] } }); // nobody there
+  assert.equal(p2.all('from-game').length, 1);
 });

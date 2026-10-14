@@ -57,11 +57,13 @@ Every message is a small JSON object with a `type`.
 | Server → game | `player` | `slot`, `name`, `color`, `connected` | A player joined, dropped, or came back |
 | Server → game | `player-removed` | `slot` | That slot's grace period ran out; it's free again |
 | Server → phone | `host-status` | `connected` | Is the game screen there? |
-| Phone → server | `input` | `steer`, `seq`, `gas`, `brake`, `rtt?` | Current steering (−1…1), a counter, pedals (from Phase 3), my ping time |
-| Server → game | `input` | `slot`, `steer`, `seq`, `gas`, `brake`, `rtt?` | The same, tagged with who sent it |
+| Phone → server | `input` | `steer`, `seq`, `gas`, `brake`, `drift`, `rtt?` | Current steering (−1…1), a counter, pedals (Phase 3), drift (Phase 5), my ping time |
+| Server → game | `input` | `slot`, `steer`, `seq`, `gas`, `brake`, `drift`, `rtt?` | The same, tagged with who sent it |
 | Either → server | `ping` | `t` | Timestamp, for measuring round-trip time |
 | Server → either | `pong` | `t` | The same timestamp, straight back |
 | Server → either | `error` | `reason` | `no-room`, `room-full`, `replaced`, `room-closed` |
+| Game → server | `to-player` | `slot`, `data` | (Phase 5) Deliver `data` to one phone: vibration, drift charge |
+| Server → phone | `from-game` | `data` | (Phase 5) What the game screen sent |
 
 The server checks everything it receives: unknown types are ignored, steering is clamped to ±1, and a connection must `join` before it can send `input`.
 

@@ -8,6 +8,7 @@
  *   game screen --host--> creates a room, gets a 4-letter code
  *   phone       --join--> takes a free player slot (1..4) in that room
  *   phone       --input-> forwarded to the room's game screen, tagged with the slot
+ *   game screen --to-player-> forwarded to one phone (vibration, drift charge…)
  *
  * Dropped connections keep their room/slot for a grace period, so a phone that
  * locks or a game screen that reloads lands back where it was.
@@ -66,6 +67,9 @@ export class Relay {
         return;
       case 'input':
         if (session.role === 'player') this.#input(session, msg);
+        return;
+      case 'to-player':
+        if (session.role === 'host') this.#toPlayer(session, msg);
         return;
       default:
       // Unknown messages are ignored: never trust what a client sends.
@@ -183,9 +187,17 @@ export class Relay {
       seq: Number.isInteger(msg.seq) ? msg.seq : 0,
       gas: msg.gas === true,
       brake: msg.brake === true,
+      drift: msg.drift === true,
     };
     if (isFiniteNumber(msg.rtt)) out.rtt = clamp(Math.round(msg.rtt), 0, 10_000);
     this.#toHost(session.room, out);
+  }
+
+  /** Game screen -> one phone. The relay doesn't look inside `data`; the phone does. */
+  #toPlayer(session, msg) {
+    if (!Number.isInteger(msg.slot)) return;
+    if (!msg.data || typeof msg.data !== 'object' || Array.isArray(msg.data)) return;
+    session.room.players.get(msg.slot)?.conn?.send({ type: 'from-game', data: msg.data });
   }
 
   // ---------- Helpers ----------

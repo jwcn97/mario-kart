@@ -107,10 +107,10 @@ test('a full right-hand circle at steady speed brings the kart back where it sta
 
 test('grass slows a fast kart down to the off-road limit, then holds it there', () => {
   let v = P.maxSpeed;
-  for (let t = 0; t < 2; t += DT) v = nextSpeed(v, { gas: true }, DT, P, true);
+  for (let t = 0; t < 2; t += DT) v = nextSpeed(v, { gas: true }, DT, P, { offRoad: true });
   close(v, P.offRoadMaxSpeed, 1e-9);
   // Slow karts on grass aren't affected.
-  assert.equal(nextSpeed(5, {}, DT, P, true), nextSpeed(5, {}, DT, P, false));
+  assert.equal(nextSpeed(5, {}, DT, P, { offRoad: true }), nextSpeed(5, {}, DT, P));
 });
 
 /** A kart on the track at sample i, `lateral` m from the centre, facing `angle` off the direction of travel. */
@@ -172,9 +172,12 @@ test('stepWorld moves every kart, tracks where it is, and reports who hit someth
     ]),
   };
   world.karts.get(2).speed = 15;
-  const hits = stepWorld(world, () => ({ gas: true }), DT);
+  const events = stepWorld(world, () => ({ gas: true }), DT);
   assert.ok(world.karts.get(1).speed > 0);
-  assert.deepEqual([...hits], [2]);
+  assert.deepEqual(
+    events.filter((e) => e.type === 'hit').map((e) => e.slot),
+    [2],
+  );
   assert.ok(Math.abs(world.karts.get(1).where.index - 50) <= 1);
   assert.equal(world.karts.get(1).offRoad, false);
 });
@@ -232,4 +235,179 @@ test('fixed step: a long pause is capped instead of replayed', () => {
   const loop = createFixedStep({ stepHz: 120, maxStepsPerFrame: 10, step: () => steps++ });
   loop.advance(60_000); // a minute in a background tab
   assert.equal(steps, 10);
+});
+
+// ---------- Drifting (Phase 5) ----------
+
+/** A kart at speed on open ground, plus helpers to drive it with an input for a while. */
+function rolling(speed = 20) {
+  const kart = createKart();
+  kart.speed = speed;
+  return kart;
+}
+const hold = (kart, input, seconds) => {
+  const events = [];
+  for (let t = 0; t < seconds - 1e-9; t += DT) {
+    const e = stepKart(kart, input, DT);
+    if (e) events.push(e);
+  }
+  return events;
+};
+
+test('a drift starts only with the button, some steering and some speed', () => {
+  const slow = rolling(5);
+  hold(slow, { steer: 1, gas: true, drift: true }, 0.1);
+  assert.equal(slow.drift.dir, 0, 'too slow');
+
+  const straight = rolling();
+  hold(straight, { steer: 0, gas: true, drift: true }, 0.1);
+  assert.equal(straight.drift.dir, 0, 'not steering');
+
+  const kart = rolling();
+  const events = hold(kart, { steer: -0.6, gas: true, drift: true }, 0.1);
+  assert.equal(kart.drift.dir, -1, 'drifting left');
+  assert.deepEqual(events, ['drift-start']);
+});
+
+test('while drifting the kart keeps turning; steering into it is tighter than out of it', () => {
+  const into = rolling();
+  hold(into, { steer: 1, gas: true, drift: true }, 0.05); // start a right drift
+  const outOf = rolling();
+  hold(outOf, { steer: 1, gas: true, drift: true }, 0.05);
+
+  const h1 = into.heading;
+  hold(into, { steer: 1, gas: true, drift: true }, 0.5);
+  const h2 = outOf.heading;
+  hold(outOf, { steer: -1, gas: true, drift: true }, 0.5); // counter-steer
+  const turnedInto = h1 - into.heading;
+  const turnedOut = h2 - outOf.heading;
+  assert.ok(turnedOut > 0, 'still turning right even when steering left');
+  assert.ok(turnedInto > turnedOut * 2, `into ${turnedInto}, out of ${turnedOut}`);
+});
+
+test('drift charge: blue after 0.9 s, orange after 2 s, mini-turbo on release', () => {
+  const kart = rolling(22);
+  const input = { steer: 1, gas: true, drift: true };
+  const early = hold(kart, input, 0.8);
+  assert.equal(kart.drift.level, 0);
+  const blue = hold(kart, input, 0.2);
+  assert.deepEqual(blue, ['drift-level-1']);
+  const orange = hold(kart, input, 1.1);
+  assert.deepEqual(orange, ['drift-level-2']);
+  assert.ok(!early.includes('drift-level-1'));
+
+  const release = hold(kart, { steer: 0, gas: true, drift: false }, DT);
+  assert.deepEqual(release, ['mini-turbo-2']);
+  assert.ok(kart.boost > P.miniTurbo2 - 0.02);
+  assert.equal(kart.drift.dir, 0);
+});
+
+test('letting go before any charge gives no boost', () => {
+  const kart = rolling();
+  hold(kart, { steer: 1, gas: true, drift: true }, 0.5);
+  const events = hold(kart, { steer: 1, gas: true, drift: false }, DT);
+  assert.deepEqual(events, ['drift-end']);
+  assert.equal(kart.boost, 0);
+});
+
+test('a drift fizzles out if the kart gets too slow', () => {
+  const kart = rolling(12);
+  hold(kart, { steer: 1, drift: true }, 0.05);
+  assert.equal(kart.drift.dir, 1);
+  hold(kart, { steer: 1, brake: true, drift: true }, 1);
+  assert.equal(kart.drift.dir, 0);
+});
+
+// ---------- Boost ----------
+
+test('boosting raises top speed, then the extra speed bleeds off gently', () => {
+  const kart = rolling(P.maxSpeed);
+  kart.boost = 1.5;
+  hold(kart, { gas: true }, 1.5);
+  close(kart.speed, P.boostSpeed, 1e-6);
+  hold(kart, { gas: true }, 0.1);
+  assert.ok(kart.speed > P.maxSpeed + 3, `0.1 s after the boost: ${kart.speed}`);
+  hold(kart, { gas: true }, 2);
+  close(kart.speed, P.maxSpeed, 1e-6);
+});
+
+test('a boost carries you over grass at speed', () => {
+  assert.ok(nextSpeed(25, { gas: true }, DT, P, { offRoad: true, boosting: true }) > 25);
+});
+
+// ---------- Track features: pads and the ramp ----------
+
+/** A kart on the centre line `back` metres before distance s, facing along the track. */
+function kartBefore(s, back, lateral = 0) {
+  const p = track.pointAt(s - back);
+  return createKart({ x: p.x + p.rx * lateral, z: p.z + p.rz * lateral, heading: p.heading });
+}
+
+test('driving over a boost pad gives a boost once', () => {
+  const pad = track.features.find((f) => f.type === 'boost');
+  const kart = kartBefore(pad.s, 4, pad.lateral);
+  kart.speed = 15;
+  const world = { track, obstacles: [], karts: new Map([[1, kart]]) };
+  const events = [];
+  for (let t = 0; t < 0.6; t += DT) events.push(...stepWorld(world, () => ({ gas: true }), DT));
+  assert.equal(events.filter((e) => e.type === 'boost-pad').length, 1);
+  assert.ok(kart.boost > 0);
+  assert.ok(kart.speed >= P.maxSpeed);
+});
+
+test('missing the pad (other lane) gives nothing', () => {
+  const pad = track.features.find((f) => f.type === 'boost');
+  const kart = kartBefore(pad.s, 4, -pad.lateral);
+  kart.speed = 15;
+  const world = { track, obstacles: [], karts: new Map([[1, kart]]) };
+  const events = [];
+  for (let t = 0; t < 0.6; t += DT) events.push(...stepWorld(world, () => ({ gas: true }), DT));
+  assert.equal(events.filter((e) => e.type === 'boost-pad').length, 0);
+});
+
+test('the ramp launches a fast kart into the air, and it lands', () => {
+  const ramp = track.features.find((f) => f.type === 'ramp');
+  const kart = kartBefore(ramp.s, 10);
+  kart.speed = P.maxSpeed;
+  const world = { track, obstacles: [], karts: new Map([[1, kart]]) };
+  const events = [];
+  let maxY = 0;
+  let airTime = 0;
+  for (let t = 0; t < 2; t += DT) {
+    events.push(...stepWorld(world, () => ({ gas: true }), DT));
+    maxY = Math.max(maxY, kart.y);
+    if (kart.airborne) airTime += DT;
+  }
+  const types = events.map((e) => e.type);
+  assert.ok(types.includes('jump') && types.includes('land'), types.join());
+  assert.ok(maxY > ramp.height, `peak ${maxY.toFixed(2)} m`);
+  assert.ok(airTime > 0.4 && airTime < 1, `air time ${airTime.toFixed(2)} s`);
+  assert.equal(kart.y, 0);
+  assert.equal(kart.airborne, false);
+});
+
+test('in the air: pedals do nothing and steering is weak', () => {
+  const kart = rolling(20);
+  kart.airborne = true;
+  kart.y = 2;
+  kart.vy = 3;
+  const v = kart.speed;
+  stepKart(kart, { gas: true, steer: 1 }, DT);
+  assert.ok(kart.speed <= v, 'no acceleration in the air');
+  const airborneTurn = -kart.heading;
+  const grounded = rolling(20);
+  stepKart(grounded, { gas: true, steer: 1 }, DT);
+  assert.ok(airborneTurn < -grounded.heading * 0.5);
+});
+
+test('hitting a wall mid-drift ends the drift with no mini-turbo', () => {
+  const kart = kartBefore(100, 0, 13);
+  kart.speed = 20;
+  kart.heading -= Math.PI / 3; // aimed at the right-hand wall
+  Object.assign(kart.drift, { dir: 1, time: 1.5, level: 1 });
+  const world = { track, obstacles: [], karts: new Map([[1, kart]]) };
+  const events = [];
+  for (let t = 0; t < 0.5; t += DT) events.push(...stepWorld(world, () => ({ gas: true, drift: true, steer: 1 }), DT));
+  assert.ok(events.some((e) => e.type === 'hit'));
+  assert.equal(kart.boost, 0);
 });

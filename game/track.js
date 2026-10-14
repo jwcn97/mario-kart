@@ -35,6 +35,13 @@ export const TRACK_LAYOUT = Object.freeze({
     [105, 95],
     [60, 97],
   ],
+  // Things on the road (Phase 5). `near` is any point close to where it goes;
+  // it's snapped onto the track when the track is built. `lateral`: + = right.
+  features: [
+    { type: 'boost', near: [-50, -133], lateral: -3, length: 6, width: 4 }, // back straight, left lane
+    { type: 'ramp', near: [9, -126], length: 8, height: 1.4 }, // full width, just after that pad
+    { type: 'boost', near: [80, 96], lateral: 3, length: 6, width: 4 }, // main straight, right lane
+  ],
   roadHalfWidth: 7, // m from the centre line to the road edge
   kerbWidth: 1.2, // red-and-white strip just outside the road (still counts as road)
   barrierOffset: 16, // m from the centre line to the tyre wall
@@ -176,6 +183,19 @@ export class Track {
     this.kerbWidth = layout.kerbWidth;
     this.barrierOffset = layout.barrierOffset;
 
+    // Features: snap each onto the track by its `near` point.
+    this.features = (layout.features ?? []).map((f) => {
+      const where = this.locate(f.near[0], f.near[1]);
+      return {
+        type: f.type,
+        s: where.s,
+        length: f.length,
+        lateral: f.lateral ?? 0,
+        halfWidth: f.width ? f.width / 2 : this.roadHalfWidth + this.kerbWidth,
+        height: f.height ?? 0,
+      };
+    });
+
     let minX = Infinity;
     let maxX = -Infinity;
     let minZ = Infinity;
@@ -270,6 +290,29 @@ export class Track {
     const { back, side } = rows[(slot - 1) % rows.length];
     const p = this.pointAt(this.length - back);
     return { x: p.x + p.rx * side, z: p.z + p.rz * side, heading: p.heading };
+  }
+
+  /** Is the located point on this feature's patch of road? Returns how far along it (0..1), or null. */
+  #on(feature, where) {
+    const along = wrapDelta(where.s - feature.s, this.length);
+    if (along < 0 || along > feature.length) return null;
+    if (Math.abs(where.lateral - feature.lateral) > feature.halfWidth) return null;
+    return along / feature.length;
+  }
+
+  /** Height of the ground here: 0, or partway up a ramp. */
+  groundHeight(where) {
+    for (const f of this.features) {
+      if (f.type !== 'ramp') continue;
+      const t = this.#on(f, where);
+      if (t !== null) return f.height * t;
+    }
+    return 0;
+  }
+
+  /** The boost pad under this point, if any. */
+  boostPadAt(where) {
+    return this.features.find((f) => f.type === 'boost' && this.#on(f, where) !== null) ?? null;
   }
 
   /** Is this lateral offset off the road (past the kerbs)? */

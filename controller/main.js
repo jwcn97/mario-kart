@@ -123,6 +123,9 @@ function handleRoomMessage(msg) {
     case 'host-status':
       net.hostConnected = msg.connected;
       break;
+    case 'from-game':
+      if (msg.data && typeof msg.data === 'object') handleGameMessage(msg.data);
+      break;
     case 'error':
       handleRoomError(msg.reason);
       break;
@@ -156,6 +159,7 @@ function sendInput() {
     seq: ++net.seq,
     gas: pedal('gas'),
     brake: pedal('brake'),
+    drift: pedal('drift'),
     rtt: net.conn.rtt === null ? undefined : Math.round(net.conn.rtt),
   });
 }
@@ -172,9 +176,9 @@ const state = {
   tooFlat: false,
   eventTimes: [],
   wakeLock: null,
-  keys: { left: false, right: false, gas: false, brake: false },
+  keys: { left: false, right: false, gas: false, brake: false, drift: false },
   keyboardAngle: 0,
-  pads: { gas: new Set(), brake: new Set() }, // pointer ids holding each pedal
+  pads: { gas: new Set(), brake: new Set(), drift: new Set() }, // pointer ids holding each pedal
 };
 
 /** Pedals: held on screen (any finger) or with the keyboard. */
@@ -332,6 +336,7 @@ const KEY_MAP = {
   ArrowDown: 'brake',
   s: 'brake',
   S: 'brake',
+  Shift: 'drift',
 };
 
 window.addEventListener('keydown', (e) => {
@@ -364,7 +369,11 @@ function setupPedal(element, name) {
   };
   element.addEventListener('pointerdown', (e) => {
     e.preventDefault();
-    element.setPointerCapture?.(e.pointerId); // keep the finger even if it slides off the edge
+    try {
+      element.setPointerCapture(e.pointerId); // keep the finger even if it slides off the edge
+    } catch {
+      // some browsers refuse capture for certain pointers: the press still counts
+    }
     pressed.add(e.pointerId);
     element.classList.add('down');
     navigator.vibrate?.(8); // a tiny tick on Android; iPhone ignores it
@@ -376,6 +385,25 @@ function setupPedal(element, name) {
 }
 setupPedal($('gas-pad'), 'gas');
 setupPedal($('brake-pad'), 'brake');
+setupPedal($('drift-pad'), 'drift');
+
+// ---------- Messages from the game screen (Phase 5) ----------
+
+/**
+ * The game screen tells this phone about its kart: { buzz: [ms, pause, ms…] }
+ * to vibrate (bumps, boosts, landings), { drift: -1 | 0 | 1 | 2 } for the
+ * drift pad's glow (-1 = not drifting, 1 = blue charge, 2 = orange).
+ */
+function handleGameMessage(data) {
+  if (Array.isArray(data.buzz)) navigator.vibrate?.(data.buzz.slice(0, 8));
+  if (typeof data.drift === 'number') {
+    const pad = $('drift-pad');
+    pad.classList.toggle('level-1', data.drift === 1);
+    pad.classList.toggle('level-2', data.drift === 2);
+    $('drift-hint').textContent =
+      data.drift === 2 ? 'let go: big boost!' : data.drift === 1 ? 'keep holding…' : 'hold while turning';
+  }
+}
 
 function tickKeyboard(dtMs, now) {
   // Ease a pretend wheel angle toward a little past full lock, like turning a real wheel.
