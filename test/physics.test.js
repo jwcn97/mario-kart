@@ -285,6 +285,26 @@ test('while drifting the kart keeps turning; steering into it is tighter than ou
   assert.ok(turnedInto > turnedOut * 2, `into ${turnedInto}, out of ${turnedOut}`);
 });
 
+test('a drift follows the wheel: a small tilt gives a gentle turn, not a hairpin', () => {
+  // Start both karts in a right drift, then compare against normal driving.
+  const turnFor = (steer, drift) => {
+    const kart = rolling();
+    if (drift) hold(kart, { steer: 1, gas: true, drift: true }, DT); // drift starts this step
+    const h = kart.heading;
+    hold(kart, { steer, gas: true, drift }, 0.25);
+    return h - kart.heading;
+  };
+  const fullLock = turnFor(1, false);
+  const straightWheel = turnFor(0, true);
+  const smallTilt = turnFor(0.2, true);
+  const smallTiltNormal = turnFor(0.2, false);
+
+  assert.ok(straightWheel > 0, 'a drift still curves with the wheel straight');
+  assert.ok(straightWheel < fullLock * 0.5, `straight wheel ${straightWheel} vs normal full lock ${fullLock}`);
+  assert.ok(smallTilt < fullLock * 0.6, `small tilt ${smallTilt} vs normal full lock ${fullLock}`);
+  assert.ok(smallTilt < smallTiltNormal * 3, `small tilt drifting ${smallTilt} vs not ${smallTiltNormal}`);
+});
+
 test('drift charge: blue after 0.9 s, orange after 2 s, mini-turbo on release', () => {
   const kart = rolling(22);
   const input = { steer: 1, gas: true, drift: true };

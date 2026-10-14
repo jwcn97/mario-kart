@@ -37,9 +37,11 @@ export const KART_PARAMS = Object.freeze({
 
   // Drifting (Phase 5)
   driftMinSpeed: 8, // m/s needed to start (and keep) a drift
-  driftStartSteer: 0.25, // how far you must be steering when you press drift
-  driftTurnOut: 0.45, // turn rate (× maxTurnRate) when steering against the drift: wide
-  driftTurnIn: 1.2, // ...and when steering into it: tight
+  driftStartSteer: 0.3, // how far you must be steering when you press drift
+  // Mid-drift turn rate, as a multiple of normal full-lock turning at this speed:
+  driftTurnOut: 0.1, // wheel turned fully against the drift: barely turning (wide line)
+  driftTurnBase: 0.35, // wheel straight: a gentle arc
+  driftTurnIn: 1.15, // wheel turned fully into the drift: a bit tighter than normal full lock
   driftDrag: 1.5, // m/s² lost while drifting
   driftLevel1: 0.9, // s of drifting for a blue mini-turbo
   driftLevel2: 2.0, // s of drifting for an orange one
@@ -165,6 +167,17 @@ export function updateDrift(kart, input, dt, p = KART_PARAMS, { offRoad = false 
   return null;
 }
 
+/**
+ * How hard a drift turns (× normal full-lock turning), from how far the wheel is
+ * turned into the drift: -1 = fully against it, 0 = straight, +1 = fully into it.
+ * Two straight lines meeting at driftTurnBase, so a small tilt only changes the
+ * turn a little and a straight wheel is a gentle arc, not a hairpin.
+ */
+export function driftTurnFactor(into, p = KART_PARAMS) {
+  const t = clamp(into, -1, 1);
+  return t >= 0 ? p.driftTurnBase + (p.driftTurnIn - p.driftTurnBase) * t : p.driftTurnBase + (p.driftTurnBase - p.driftTurnOut) * t;
+}
+
 /** End a drift with no mini-turbo (hit a wall, too slow). */
 export function cancelDrift(kart) {
   Object.assign(kart.drift, { dir: 0, time: 0, level: 0 });
@@ -195,8 +208,7 @@ export function stepKart(kart, input, dt, p = KART_PARAMS, { offRoad = false } =
   const steer = clamp(input.steer ?? 0, -1, 1);
   let turn; // rad/s, positive = right
   if (drifting) {
-    const into = (steer * kart.drift.dir + 1) / 2; // 0 = steering out of the drift, 1 = into it
-    turn = kart.drift.dir * p.maxTurnRate * (p.driftTurnOut + (p.driftTurnIn - p.driftTurnOut) * into);
+    turn = kart.drift.dir * p.maxTurnRate * turnGrip(kart.speed, p) * driftTurnFactor(steer * kart.drift.dir, p);
   } else {
     turn = steer * p.maxTurnRate * turnGrip(kart.speed, p) * Math.sign(kart.speed);
   }

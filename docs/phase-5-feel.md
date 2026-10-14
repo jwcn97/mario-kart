@@ -26,7 +26,7 @@ A drift is a decision you commit to. Press drift while steering at speed, and th
 ```mermaid
 stateDiagram-v2
     [*] --> Driving
-    Driving --> Drifting: hold Drift + steering ≥ 25% + speed ≥ 8 m/s
+    Driving --> Drifting: hold Drift + steering ≥ 30% + speed ≥ 8 m/s
     Drifting --> Blue: held 0.9 s
     Blue --> Orange: held 2.0 s
     Drifting --> Driving: let go (no boost)
@@ -39,10 +39,20 @@ stateDiagram-v2
 
 | While drifting | Rule |
 | --- | --- |
-| Turning | Always turns the drift's way. Steering **into** it: tight (1.2 × normal max). Steering **out**: wide (0.45 ×). You can't straighten up without letting go |
+| Turning | Always turns the drift's way, and follows the wheel. Wheel straight: a gentle arc (0.35 × normal full lock). Fully **into** it: tight (1.15 ×). Fully **out**: nearly straight (0.1 ×). Like normal steering, it turns less at top speed. You can't straighten up completely without letting go |
 | Speed | Loses 1.5 m/s² while sliding |
 | Charging | Only on the road and on the ground: grass and air pause the timer |
 | Ending | Let go for the mini-turbo. Hitting a wall or dropping below ~5 m/s ends it with nothing |
+
+**Tuning note (after first phone test).** The first version turned at a fixed 0.45–1.2 × full lock *whatever the speed*, so even a straight wheel turned harder mid-drift than full lock does normally at speed. With tilt steering that felt like the kart spinning on its own. Now the drift turn is two straight lines through `driftTurnBase` and is scaled by the same speed grip as normal steering. At 20 m/s:
+
+| Wheel (into the drift) | Normal | First version | Now |
+| --- | --- | --- | --- |
+| −100% (counter-steer) | n/a | 1.17 rad/s | 0.17 rad/s |
+| 0% | 0 | 2.15 rad/s | 0.61 rad/s |
+| 20% | 0.35 rad/s | 2.34 rad/s | 0.88 rad/s |
+| 50% | 0.87 rad/s | 2.63 rad/s | 1.30 rad/s |
+| 100% | 1.73 rad/s | 3.12 rad/s | 1.99 rad/s |
 
 **The slide is visual.** The physics kart still moves along its heading, just turning harder. What you see swings the kart's nose 23° into the turn on a separate "drifter" group, so it looks like it's sliding sideways. This is how most kart racers do it: predictable for the player, easy to tune, no unstable tyre maths.
 
@@ -131,7 +141,8 @@ Rules that keep it sane:
 Press **T** on the game screen. Every number in `KART_PARAMS` has a slider, grouped into Speed, Steering, Drift, Boost & jumps, and Grass & walls. Changes apply on the next physics step and are saved in the browser. **Copy as code** puts the current values on the clipboard as a `KART_PARAMS` block to paste into `physics.js`; **Reset to defaults** undoes everything.
 
 Good things to try:
-- `driftTurnIn` / `driftTurnOut`: how much control you have mid-drift
+- `driftTurnBase`: how hard a drift turns with the wheel straight. Lower it if drifts feel twitchy
+- `driftTurnIn` / `driftTurnOut`: how much tighter or wider the wheel can make a drift
 - `driftLevel1` / `driftLevel2`: how long to hold for each charge
 - `boostSpeed` and `overSpeedDrag`: how big a boost feels and how long it lingers
 - `gravity`: floaty or snappy jumps
@@ -141,7 +152,7 @@ In development, the console also has `kart.params`.
 ## Tests
 
 `npm test` runs 112 tests. New this phase:
-- `test/physics.test.js`: drift start conditions, into vs out of the drift, charge levels and mini-turbos, no boost without charge, fizzling out, boost top speed and fade, boosting over grass, pads (hit and miss), the ramp launch and landing, the air, a wall ending a drift.
+- `test/physics.test.js`: drift start conditions, into vs out of the drift, small tilts giving gentle drift turns, charge levels and mini-turbos, no boost without charge, fizzling out, boost top speed and fade, boosting over grass, pads (hit and miss), the ramp launch and landing, the air, a wall ending a drift.
 - `test/track.test.js`: features on the road, the ramp slope, pad patches.
 - `test/feedback.test.js` (5): event → buzz and shake mapping, scrape filtering, the 120 ms limit, landing squash, drift-level messages.
 - `test/relay.test.js` and `test/input.test.js`: the `to-player` channel, the `drift` input, Shift keys.

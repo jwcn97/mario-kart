@@ -118,7 +118,7 @@ A short log of design choices. Newest at the bottom. Each entry: what we chose, 
 
 ## 21. Drifting is a locked turn plus a visual slide (Phase 5)
 
-**Chose:** while drifting, the physics kart keeps moving along its heading but turns at a fixed-direction rate (steering only tightens or widens it); the model swings 23° into the turn on its own group.
+**Chose:** while drifting, the physics kart keeps moving along its heading but always turns in the drift's direction (steering only tightens or widens it); the model swings 23° into the turn on its own group. See #27 for how hard it turns.
 **Instead of:** real sideways velocity and tyre slip.
 **Why:** predictable with tilt steering, easy to tune with two numbers, and it's how most kart racers do it. Decision 14 (velocity along the nose) still holds.
 
@@ -147,3 +147,9 @@ A short log of design choices. Newest at the bottom. Each entry: what we chose, 
 
 **Chose:** a lil-gui panel over a mutable copy of `KART_PARAMS`, saved in localStorage, with "Copy as code".
 **Why:** game feel is found by driving, not by reasoning. The defaults stay in code (and in tests); experiments stay local until you paste them in.
+
+## 27. Drift turning follows the wheel and the speed (Phase 5, after phone testing)
+
+**Chose:** drift turn = normal full-lock turn at this speed × a factor from how far the wheel is turned into the drift: 0.1 fully out, 0.35 straight, 1.15 fully in. Drifts start at 30% steering (was 25%).
+**Instead of:** a fixed rate between 0.45 and 1.2 × the maximum turn rate, ignoring speed.
+**Why:** the first version turned harder with a straight wheel than normal full lock does at speed, so a slight tilt sent the kart round in a tight circle. Tilt steering is imprecise, so how much the kart turns has to track how much you tilt, in a drift as much as out of one. Saved tuning moved to a new storage key, since old drift numbers mean something different now.

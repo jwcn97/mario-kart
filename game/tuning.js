@@ -9,7 +9,7 @@
 import GUI from 'lil-gui';
 import { KART_PARAMS } from './physics.js';
 
-const STORAGE_KEY = 'kart.params.v1';
+const STORAGE_KEY = 'kart.params.v2'; // v2: drift turning changed meaning, old tweaks dropped
 
 /** [key, min, max, step] per folder. Anything in KART_PARAMS not listed here isn't tunable. */
 const FOLDERS = {
@@ -28,8 +28,9 @@ const FOLDERS = {
   Drift: [
     ['driftMinSpeed', 2, 20, 0.5],
     ['driftStartSteer', 0, 0.9, 0.05],
-    ['driftTurnOut', 0, 1.5, 0.05],
-    ['driftTurnIn', 0.5, 2.5, 0.05],
+    ['driftTurnOut', 0, 1, 0.05],
+    ['driftTurnBase', 0, 1.5, 0.05],
+    ['driftTurnIn', 0.3, 2, 0.05],
     ['driftDrag', 0, 8, 0.1],
     ['driftLevel1', 0.2, 3, 0.05],
     ['driftLevel2', 0.5, 5, 0.05],
